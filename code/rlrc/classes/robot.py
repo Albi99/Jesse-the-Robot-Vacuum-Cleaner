@@ -42,17 +42,7 @@ class Robot:
         self.environment = environment
         self.angle = random.uniform(0, 2*math.pi)
         self.grid = np.full((MAP_GRID_SIZE, MAP_GRID_SIZE), 0, dtype=np.int16)
-        self.epsilon = 1e-5
-        # Calcola offset per mappa interna: posiziona il robot al centro della griglia
-        # grid_center = MAP_GRID_SIZE // 2
-        # robot_cell_x = int(self.x // CELL_SIDE)
-        # robot_cell_y = int(self.y // CELL_SIDE)
-        # self.map_offset_x = grid_center - robot_cell_x
-        # self.map_offset_y = grid_center - robot_cell_y
-        # print(f'coordinate: {self.x} {self.y}')
-        # print(f'start cell: {robot_cell_x} {robot_cell_y}')
-        # print(f'offset: {self.map_offset_x} {self.map_offset_y}')
-        # print(grid_center, robot_cell_x + self.map_offset_x, robot_cell_y + self.map_offset_y)
+        self.epsilon = 1e-6
 
     def move_random(self):
         # Random small angle variation
@@ -138,7 +128,7 @@ class Robot:
             for dy_cell in range(-self.footprint_cells, self.footprint_cells +1):
                 fill_x = robot_center_gx + dx_cell
                 fill_y = robot_center_gy + dy_cell
-                self.grid[fill_y, fill_x] = 4
+                self.grid[fill_y, fill_x] = 3
 
     def draw(self, surface):
         # Robot body
@@ -167,13 +157,11 @@ class Robot:
                 elif val == 1:
                     color = WHITE       # free
                 elif val == 2:
-                    color = BLUE        # robot body
+                    color = BLUE        # robot base
                 elif val == 3:
-                    color = SKY_BLUE    # robot base
-                elif val == 4:
                     color = GREEN       # cleaned
                 else:
-                    color = RED         # re-clea
+                    color = RED          # re-cleaned
                 
                     
                 rect = pygame.Rect(x*CELL_SIDE, y*CELL_SIDE, CELL_SIDE, CELL_SIDE)

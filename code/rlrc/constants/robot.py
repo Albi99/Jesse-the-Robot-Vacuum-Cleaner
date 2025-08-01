@@ -5,7 +5,7 @@ ROBOT_SPEED = 10.0  # pixels per frame
 
 # LiDAR
 LIDAR_NUM_RAYS = 36
-LIDAR_MAX_DISTANCE = 200    
+LIDAR_MAX_DISTANCE = 400    
 
 # Internal map
 MAP_GRID_SIZE = 700     # Numero di celle (per lato) nella mappa interna
@@ -16,8 +16,7 @@ LABELS = {
     -1 : "static obstacle",
       0: "unknown",
       1: "free",
-      2: "robot body",
-      3: "robot base",
-      4: "cleaned",
-      5: "re-cleaned"
+      2: "robot base",
+      3: "cleaned",
+      4: "re-cleaned"
 }
