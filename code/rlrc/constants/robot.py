@@ -15,9 +15,9 @@ LABELS = {
     -2 : "dynamic obstacle",
     -1 : "static obstacle",
       0: "unknown",
-      1: "robot body",
-      2: "robot base",
-      3: "free",
+      1: "free",
+      2: "robot body",
+      3: "robot base",
       4: "cleaned",
       5: "re-cleaned"
 }
