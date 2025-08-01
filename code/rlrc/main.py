@@ -2,12 +2,13 @@ import pygame
 
 from .classes.environment import Environment
 from .classes.robot import Robot
-from .constants.robot import MAP_GRID_SIZE, ROBOT_RADIUS, ROBOT_SPEED, LIDAR_NUM_RAYS, LIDAR_MAX_DISTANCE
-from .constants.colors import WHITE, TMP_BACKGROUND
+from .constants.robot import MAP_GRID_SIZE, ROBOT_RADIUS, ROBOT_SPEED, LIDAR_NUM_RAYS, LIDAR_MAX_DISTANCE, LABELS
+from .constants.colors import BLACK, WHITE, TMP_BACKGROUND
 
 
 def main():
     pygame.init()
+    font = pygame.font.Font(None, 20)
     screen = pygame.display.set_mode((MAP_GRID_SIZE*2 + 150, MAP_GRID_SIZE + 100))
     pygame.display.set_caption("Robot Vacuum Prototype")
 
@@ -26,6 +27,7 @@ def main():
         robot.move_random()
         robot.clean()
         rays = robot.sense_lidar()
+        counts = robot.grid_stats()
 
         # Drawing
         screen.fill(TMP_BACKGROUND)
@@ -41,6 +43,10 @@ def main():
         robot.draw_map(internal_map_surface)
         robot.draw(internal_map_surface)
         # robot.draw_lidar(internal_map_surface, rays)
+
+        for i, (val, count) in enumerate(sorted(counts.items())):
+            txt = font.render(f'({val}) {LABELS[val]}: {count}', True, BLACK)
+            screen.blit(txt, (MAP_GRID_SIZE + 150, 75 + 20*i))
 
         pygame.display.flip()       # Update all the screen
         clock.tick(60)              # ~60 FPS

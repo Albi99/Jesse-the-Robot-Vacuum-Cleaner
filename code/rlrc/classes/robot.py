@@ -178,3 +178,7 @@ class Robot:
                     
                 rect = pygame.Rect(x*CELL_SIDE, y*CELL_SIDE, CELL_SIDE, CELL_SIDE)
                 pygame.draw.rect(surface, color, rect)
+    
+    def grid_stats(self):
+        unique, counts = np.unique(self.grid, return_counts=True)
+        return dict(zip(unique, counts))
