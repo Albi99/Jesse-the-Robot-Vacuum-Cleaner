@@ -32,6 +32,7 @@ def ray_segment_intersection(px, py, dx, dy, x1, y1, x2, y2):
 
 class Robot:
     def __init__(self, x, y, radius, speed, lidar_num_rays, lidar_max_distance, environment):
+        self.step = 0
         self.x = x
         self.y = y
         self.radius = radius
@@ -40,28 +41,30 @@ class Robot:
         self.LIDAR_NUM_RAYS = lidar_num_rays
         self.LIDAR_MAX_DISTANCE = lidar_max_distance
         self.environment = environment
-        self.angle = random.uniform(0, 2*math.pi)
+        self.angle = 0      # random.uniform(0, 2*math.pi)
         self.grid = np.full((MAP_GRID_SIZE, MAP_GRID_SIZE), 0, dtype=np.int16)
         self.epsilon = 1e-6
 
-    # def move_random(self):
-    #     # Random small angle variation
-    #     self.angle += random.uniform(-0.3, 0.3)
-    #     dx = math.cos(self.angle) * self.speed
-    #     dy = math.sin(self.angle) * self.speed
-    #     nx, ny = self.x + dx, self.y + dy
-    #     # Check wall collision
-    #     if nx - self.radius < self.environment.x_start or nx + self.radius > self.environment.x_end:
-    #         self.angle = math.pi - self.angle
-    #         return
-    #     if ny - self.radius < self.environment.y_start or ny + self.radius > self.environment.y_end:
-    #         self.angle = -self.angle
-    #         return
-    #     self.x, self.y = nx, ny
+    # def paly_step(self, action):
+    #     self.step += 1
+    #     # here add optional user input
+    #     self._move()
+    #     # add reward
+    #     # here add optional dynamics obstacol movement
 
-    def move_random(self):
-        # Random small angle variation
-        self.angle += random.uniform(-0.3, 0.3)
+    def move(self, direction):
+        if direction == 'right':
+            self.angle = 0
+        elif direction == 'down':
+            self.angle = 1/2 * math.pi
+        elif direction == 'up':
+            self.angle = 3/2 * math.pi
+        elif direction == 'left':
+            self.angle = math.pi
+        else:
+            # angle difference (float)
+            self.angle += direction
+
         dx = math.cos(self.angle) * self.speed
         dy = math.sin(self.angle) * self.speed
         nx, ny = self.x + dx, self.y + dy
@@ -71,12 +74,19 @@ class Robot:
             dnx, dny = int(nx // CELL_SIDE), int(ny // CELL_SIDE)
             print(f"Collision detected at: real coordinates ({nx:.2f}, {ny:.2f}) ")
             print(f"                          internal map: ({dnx}, {dny}) ")
-            # Reflect angle to bounce back
-            self.angle += math.pi
-            return
+        else:
+            # No collision: commit move
+            self.x, self.y = nx, ny
+            self._clean()
+        
+        rays = self._sense_lidar()
+        counts = self._grid_stats()
+        return rays, counts
 
-        # No collision: commit move
-        self.x, self.y = nx, ny
+    def move_random(self):
+        # Random small angle variation
+        delta = random.uniform(-0.3, 0.3)
+        return self.move(delta)
 
     def _check_collision(self, cx, cy):
         """
@@ -109,13 +119,13 @@ class Robot:
         proj_y = y1 + t * sy
         return math.hypot(px - proj_x, py - proj_y)
 
-    def sense_lidar(self):
+    def _sense_lidar(self):
         rays = []
         step_size = CELL_SIDE / 10
         for i in range(self.LIDAR_NUM_RAYS):
             ray_angle = self.angle + (i / self.LIDAR_NUM_RAYS) * 2 * math.pi
             dx, dy = math.cos(ray_angle), math.sin(ray_angle)
-            dist, hit_x, hit_y = self.cast_ray(ray_angle)
+            dist, hit_x, hit_y = self._cast_ray(ray_angle)
             # determino la distanza massima da marcare
             max_range = dist if dist >= 0 else self.LIDAR_MAX_DISTANCE
             # campiono lungo la direzione per segnare liberi
@@ -149,7 +159,7 @@ class Robot:
             rays.append((hit_x, hit_y))
         return rays
 
-    def cast_ray(self, angle):
+    def _cast_ray(self, angle):
         # Direzione del raggio
         dx = math.cos(angle)
         dy = math.sin(angle)
@@ -170,7 +180,7 @@ class Robot:
         # Nessuna intersezione trovata
         return -1, None, None
 
-    def clean(self):
+    def _clean(self):
         # robot position 
         robot_center_gx = int(self.x // CELL_SIDE)
         robot_center_gy = int(self.y // CELL_SIDE)
@@ -180,43 +190,8 @@ class Robot:
                 fill_y = robot_center_gy + dy_cell
                 self.grid[fill_y, fill_x] = 3
 
-    def draw(self, surface):
-        # Robot body
-        pygame.draw.circle(surface, BLUE, (int(self.x), int(self.y)), self.radius, 2)
-        # Robot orientation
-        orientation_x = int(self.x + math.cos(self.angle) * self.radius * 1.5)
-        orientation_y = int(self.y + math.sin(self.angle) * self.radius * 1.5)
-        pygame.draw.line(surface, BLUE, (int(self.x), int(self.y)), (orientation_x, orientation_y), 5)
-
-    def draw_lidar(self, surface, rays):
-        for hit_x, hit_y in rays:
-            if hit_x is not None and hit_y is not None:
-                pygame.draw.line(surface, BLUE, (int(self.x), int(self.y)), (int(hit_x), int(hit_y)), 1)
-
-    def draw_map(self, surface):
-        # draw occupancy grid to a given surface of size ENVIRONMENT_WIDTH x ENVIRONMENT_HEIGHT
-        for y in range(MAP_GRID_SIZE):
-            for x in range(MAP_GRID_SIZE):
-                val = self.grid[y, x]
-                if val == -2:
-                    color = YELLOW      # dynamics obstacol
-                elif val == -1:
-                    color = BLACK       # staic obstacle
-                elif val == 0:
-                    color = GRAY        # unknown
-                elif val == 1:
-                    color = WHITE       # free
-                elif val == 2:
-                    color = BLUE        # robot base
-                elif val == 3:
-                    color = GREEN       # cleaned
-                else:
-                    color = RED          # re-cleaned
-                
-                    
-                rect = pygame.Rect(x*CELL_SIDE, y*CELL_SIDE, CELL_SIDE, CELL_SIDE)
-                pygame.draw.rect(surface, color, rect)
     
-    def grid_stats(self):
+    
+    def _grid_stats(self):
         unique, counts = np.unique(self.grid, return_counts=True)
         return dict(zip(unique, counts))

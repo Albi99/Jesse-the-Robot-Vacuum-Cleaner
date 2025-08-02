@@ -2,54 +2,55 @@ import pygame
 
 from .classes.environment import Environment
 from .classes.robot import Robot
-from .constants.configuration import MAP_GRID_SIZE, ROBOT_RADIUS, ROBOT_SPEED, LIDAR_NUM_RAYS, LIDAR_MAX_DISTANCE, LABELS
-from .constants.colors import BLACK, WHITE, TMP_BACKGROUND
-from .constants.maps import MAP_1, MAP_2, MAP_3
+from .classes.graphics import Graphics
+from .constants.configuration import MAP_GRID_SIZE, ROBOT_RADIUS, ROBOT_SPEED, LIDAR_NUM_RAYS, LIDAR_MAX_DISTANCE
+from .constants.maps import MAP_1, MAP_2, MAP_3, MAP_4
+
+
+
 
 
 def main():
-    pygame.init()
-    font = pygame.font.Font(None, 20)
-    screen = pygame.display.set_mode((MAP_GRID_SIZE*2 + 150, MAP_GRID_SIZE + 100))
-    pygame.display.set_caption("Robot Vacuum Prototype")
 
     environment = Environment(MAP_3)
     # il robot parte al centro della stanza
     robot = Robot(MAP_GRID_SIZE//2, MAP_GRID_SIZE//2, ROBOT_RADIUS, ROBOT_SPEED, LIDAR_NUM_RAYS, LIDAR_MAX_DISTANCE, environment)
+    graphics = Graphics(environment, robot)
 
-    clock = pygame.time.Clock()
     running = True
     while running:
+
+
+        # Human
+        action = None
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
-                running = False
+                running = False          # chiusura con “X”
+            elif event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_ESCAPE:
+                    running = False      # chiusura con Esc
 
-        # Simulation step
-        robot.move_random()
-        robot.clean()
-        rays = robot.sense_lidar()
-        counts = robot.grid_stats()
+                elif event.key == pygame.K_UP:
+                    action = 'up'
+                elif event.key == pygame.K_DOWN:
+                    action = 'down'
+                elif event.key == pygame.K_LEFT:
+                    action = 'left'
+                elif event.key == pygame.K_RIGHT:
+                    action = 'right'
 
-        # Drawing
-        screen.fill(TMP_BACKGROUND)
-        # Left: real environment
-        real_world_surface = screen.subsurface((50, 50, MAP_GRID_SIZE, MAP_GRID_SIZE))
-        real_world_surface.fill(WHITE)
-        environment.draw(real_world_surface)
-        robot.draw_lidar(real_world_surface, rays)
-        robot.draw(real_world_surface)
-        # Right: internal map
-        internal_map_surface = screen.subsurface((MAP_GRID_SIZE + 100, 50, MAP_GRID_SIZE, MAP_GRID_SIZE))
-        internal_map_surface.fill(WHITE)
-        robot.draw_map(internal_map_surface)
-        robot.draw(internal_map_surface)
-        # robot.draw_lidar(internal_map_surface, rays)
+        if action is not None:
+            rays, grid_status = robot.move(action)
+            graphics.update(rays, grid_status)
 
-        for i, (val, count) in enumerate(sorted(counts.items())):
-            txt = font.render(f'({val}) {LABELS[val]}: {count}', True, BLACK)
-            screen.blit(txt, (MAP_GRID_SIZE + 150, 75 + 20*i))
 
-        pygame.display.flip()       # Update all the screen
-        clock.tick(60)              # ~60 FPS
+        # Random
+        # rays, counts = robot.move_random()
+        # graphics.update(rays, counts)
+
+
+        # AI
+        # ...
+
 
     pygame.quit()

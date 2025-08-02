@@ -1,0 +1,85 @@
+import pygame
+import math
+
+from ..constants.configuration import MAP_GRID_SIZE, CELL_SIDE, LABELS
+from ..constants.colors import YELLOW, BLACK, GRAY, WHITE, BLUE, GREEN, RED, TMP_BACKGROUND
+
+
+class Graphics:
+            
+    def __init__(self, envirnonment, robot):
+        self.environment = envirnonment
+        self.robot = robot
+        pygame.init()
+        pygame.display.set_caption("Robot Vacuum Prototype")
+        self.font = pygame.font.Font(None, 20)
+        self.screen = pygame.display.set_mode((MAP_GRID_SIZE*2 + 150, MAP_GRID_SIZE + 100))
+        self.clock = pygame.time.Clock()
+                
+    def update(self, rays, grid_status):
+        self.screen.fill(TMP_BACKGROUND)
+        # Left: real environment
+        real_world_surface = self.screen.subsurface((50, 50, MAP_GRID_SIZE, MAP_GRID_SIZE))
+        real_world_surface.fill(WHITE)
+        self._draw_walls(real_world_surface)
+        self._draw_lidar(real_world_surface, rays)
+        self._draw_robot(real_world_surface)
+        # Right: internal map
+        internal_map_surface = self.screen.subsurface((MAP_GRID_SIZE + 100, 50, MAP_GRID_SIZE, MAP_GRID_SIZE))
+        internal_map_surface.fill(WHITE)
+        self._draw_map(internal_map_surface)
+        self._draw_robot(internal_map_surface)
+        # robot.draw_lidar(internal_map_surface, rays)
+
+        for i, (val, count) in enumerate(sorted(grid_status.items())):
+            txt = self.font.render(f'({val}) {LABELS[val]}: {count}', True, BLACK)
+            self.screen.blit(txt, (MAP_GRID_SIZE + 150, 75 + 20*i))
+
+        pygame.display.flip()       # Update all the screen
+        self.clock.tick(60)              # ~60 FPS
+
+    def _draw_walls(self, surface):
+        for wall in self.environment.walls:
+            pygame.draw.line(
+                surface, 
+                BLACK,                      # color
+                (wall[0], wall[1]),         # starting point
+                (wall[2], wall[3]),         # ending point
+                2                           # thickness
+            )
+    
+    def _draw_robot(self, surface):
+        # Robot body
+        pygame.draw.circle(surface, BLUE, (int(self.robot.x), int(self.robot.y)), self.robot.radius, 2)
+        # Robot orientation
+        orientation_x = int(self.robot.x + math.cos(self.robot.angle) * self.robot.radius * 1.5)
+        orientation_y = int(self.robot.y + math.sin(self.robot.angle) * self.robot.radius * 1.5)
+        pygame.draw.line(surface, BLUE, (int(self.robot.x), int(self.robot.y)), (orientation_x, orientation_y), 5)
+
+    def _draw_lidar(self, surface, rays):
+        for hit_x, hit_y in rays:
+            if hit_x is not None and hit_y is not None:
+                pygame.draw.line(surface, BLUE, (int(self.robot.x), int(self.robot.y)), (int(hit_x), int(hit_y)), 1)
+
+    def _draw_map(self, surface):
+        # draw occupancy grid to a given surface of size ENVIRONMENT_WIDTH x ENVIRONMENT_HEIGHT
+        for y in range(MAP_GRID_SIZE):
+            for x in range(MAP_GRID_SIZE):
+                val = self.robot.grid[y, x]
+                if val == -2:
+                    color = YELLOW      # dynamics obstacol
+                elif val == -1:
+                    color = BLACK       # staic obstacle
+                elif val == 0:
+                    color = GRAY        # unknown
+                elif val == 1:
+                    color = WHITE       # free
+                elif val == 2:
+                    color = BLUE        # robot base
+                elif val == 3:
+                    color = GREEN       # cleaned
+                else:
+                    color = RED          # re-cleaned
+
+                rect = pygame.Rect(x*CELL_SIDE, y*CELL_SIDE, CELL_SIDE, CELL_SIDE)
+                pygame.draw.rect(surface, color, rect)

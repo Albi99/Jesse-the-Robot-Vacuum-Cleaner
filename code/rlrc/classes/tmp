@@ -1,0 +1,4 @@
+up      3/2 * math.pi
+down    1/2 * math.pi
+left    math.pi
+right   0
