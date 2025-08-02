@@ -3,7 +3,7 @@ import math
 import random
 import pygame
 
-from ..constants.robot import MAP_GRID_SIZE, CELL_SIDE
+from ..constants.configuration import MAP_GRID_SIZE, CELL_SIDE
 from ..constants.colors import YELLOW, BLACK, GRAY, WHITE, BLUE, SKY_BLUE, GREEN, RED
 
 
@@ -44,20 +44,70 @@ class Robot:
         self.grid = np.full((MAP_GRID_SIZE, MAP_GRID_SIZE), 0, dtype=np.int16)
         self.epsilon = 1e-6
 
+    # def move_random(self):
+    #     # Random small angle variation
+    #     self.angle += random.uniform(-0.3, 0.3)
+    #     dx = math.cos(self.angle) * self.speed
+    #     dy = math.sin(self.angle) * self.speed
+    #     nx, ny = self.x + dx, self.y + dy
+    #     # Check wall collision
+    #     if nx - self.radius < self.environment.x_start or nx + self.radius > self.environment.x_end:
+    #         self.angle = math.pi - self.angle
+    #         return
+    #     if ny - self.radius < self.environment.y_start or ny + self.radius > self.environment.y_end:
+    #         self.angle = -self.angle
+    #         return
+    #     self.x, self.y = nx, ny
+
     def move_random(self):
         # Random small angle variation
         self.angle += random.uniform(-0.3, 0.3)
         dx = math.cos(self.angle) * self.speed
         dy = math.sin(self.angle) * self.speed
         nx, ny = self.x + dx, self.y + dy
-        # Check wall collision
-        if nx - self.radius < self.environment.x_start or nx + self.radius > self.environment.x_end:
-            self.angle = math.pi - self.angle
+
+        # Check collision with walls using segment-to-circle distance
+        if self._check_collision(nx, ny):
+            dnx, dny = int(nx // CELL_SIDE), int(ny // CELL_SIDE)
+            print(f"Collision detected at: real coordinates ({nx:.2f}, {ny:.2f}) ")
+            print(f"                          internal map: ({dnx}, {dny}) ")
+            # Reflect angle to bounce back
+            self.angle += math.pi
             return
-        if ny - self.radius < self.environment.y_start or ny + self.radius > self.environment.y_end:
-            self.angle = -self.angle
-            return
+
+        # No collision: commit move
         self.x, self.y = nx, ny
+
+    def _check_collision(self, cx, cy):
+        """
+        Controlla se il cerchio (cx, cy, radius) interseca uno qualsiasi dei segmenti walls.
+        """
+        for x1, y1, x2, y2 in self.environment.walls:
+            # Calcola la distanza minima dal centro al segmento
+            if self._point_segment_dist(cx, cy, x1, y1, x2, y2) <= self.radius + self.epsilon:
+                return True
+        return False
+
+    def _point_segment_dist(self, px, py, x1, y1, x2, y2):
+        """
+        Distanza minima tra punto (px, py) e segmento (x1,y1)-(x2,y2).
+        """
+        # Vettore segmento
+        sx = x2 - x1
+        sy = y2 - y1
+        # Vettore punto->segmento inizio
+        vx = px - x1
+        vy = py - y1
+        # Proiezione scalare
+        seg_len2 = sx * sx + sy * sy
+        if seg_len2 == 0:
+            # Punto e segmento coincidenti
+            return math.hypot(vx, vy)
+        t = (vx * sx + vy * sy) / seg_len2
+        t = max(0.0, min(1.0, t))
+        proj_x = x1 + t * sx
+        proj_y = y1 + t * sy
+        return math.hypot(px - proj_x, py - proj_y)
 
     def sense_lidar(self):
         rays = []

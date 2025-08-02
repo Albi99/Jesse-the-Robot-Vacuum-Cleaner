@@ -2,8 +2,9 @@ import pygame
 
 from .classes.environment import Environment
 from .classes.robot import Robot
-from .constants.robot import MAP_GRID_SIZE, ROBOT_RADIUS, ROBOT_SPEED, LIDAR_NUM_RAYS, LIDAR_MAX_DISTANCE, LABELS
+from .constants.configuration import MAP_GRID_SIZE, ROBOT_RADIUS, ROBOT_SPEED, LIDAR_NUM_RAYS, LIDAR_MAX_DISTANCE, LABELS
 from .constants.colors import BLACK, WHITE, TMP_BACKGROUND
+from .constants.maps import MAP_1, MAP_2, MAP_3
 
 
 def main():
@@ -12,7 +13,7 @@ def main():
     screen = pygame.display.set_mode((MAP_GRID_SIZE*2 + 150, MAP_GRID_SIZE + 100))
     pygame.display.set_caption("Robot Vacuum Prototype")
 
-    environment = Environment()
+    environment = Environment(MAP_3)
     # il robot parte al centro della stanza
     robot = Robot(MAP_GRID_SIZE//2, MAP_GRID_SIZE//2, ROBOT_RADIUS, ROBOT_SPEED, LIDAR_NUM_RAYS, LIDAR_MAX_DISTANCE, environment)
 

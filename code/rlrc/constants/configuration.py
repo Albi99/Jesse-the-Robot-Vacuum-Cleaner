@@ -1,7 +1,7 @@
 
 # Robot
-ROBOT_RADIUS = 15
-ROBOT_SPEED = 10.0  # pixels per frame
+ROBOT_RADIUS = 20
+ROBOT_SPEED = 5.0  # pixels per frame
 
 # LiDAR
 LIDAR_NUM_RAYS = 36
@@ -9,7 +9,7 @@ LIDAR_MAX_DISTANCE = 400
 
 # Internal map
 MAP_GRID_SIZE = 700     # Numero di celle (per lato) nella mappa interna
-CELL_SIDE = 5
+CELL_SIDE = 5  # pixel
 
 LABELS = {
     -2 : "dynamic obstacle",
