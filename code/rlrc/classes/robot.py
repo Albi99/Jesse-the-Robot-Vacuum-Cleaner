@@ -3,7 +3,7 @@ import math
 import random
 import pygame
 
-from ..constants.configuration import MAP_GRID_SIZE, CELL_SIDE
+from ..constants.configuration import MAP_GRID_SIZE, CELL_SIDE, LABELS
 from ..constants.colors import YELLOW, BLACK, GRAY, WHITE, BLUE, SKY_BLUE, GREEN, RED
 
 
@@ -45,12 +45,17 @@ class Robot:
         self.grid = np.full((MAP_GRID_SIZE, MAP_GRID_SIZE), 0, dtype=np.int16)
         self.epsilon = 1e-6
 
-    # def paly_step(self, action):
-    #     self.step += 1
-    #     # here add optional user input
-    #     self._move()
-    #     # add reward
-    #     # here add optional dynamics obstacol movement
+    # TODO
+    def paly_step(self, action):
+        self.step += 1
+        # here add optional user input
+        self._move(action)
+        # add reward
+        # here add optional dynamics obstacol movement
+    
+    # TODO
+    def reset(self):
+        pass
 
     def move(self, direction):
         if direction == 'right':
@@ -80,8 +85,8 @@ class Robot:
             self._clean()
         
         rays = self._sense_lidar()
-        counts = self._grid_stats()
-        return rays, counts
+        grid_stats = self.grid_stats()
+        return rays, grid_stats
 
     def move_random(self):
         # Random small angle variation
@@ -190,8 +195,67 @@ class Robot:
                 fill_y = robot_center_gy + dy_cell
                 self.grid[fill_y, fill_x] = 3
 
-    
-    
-    def _grid_stats(self):
+    def grid_stats(self):
         unique, counts = np.unique(self.grid, return_counts=True)
         return dict(zip(unique, counts))
+    
+    def grid_view(self):
+        """
+        Restituisce una lista di liste di tuple (count, distance) per ogni label.
+        Ogni sottolista corrisponde a un raggio laterale dal bounding square del robot
+        e contiene esattamente len(labels) tuple, una per ciascuna label, anche se negative o non contigue.
+        """
+        # Parametri di griglia e label
+        labels = LABELS.keys()
+
+        # Calcola bounding square in celle
+        radius_cells = self.radius / CELL_SIDE
+        side = math.ceil(radius_cells * 2)
+        cx = int(self.x // CELL_SIDE)
+        cy = int(self.y // CELL_SIDE)
+        x0 = cx - side // 2
+        y0 = cy - side // 2
+
+        # Costruisci raggi laterali (punto, direzione)
+        rays = []
+        for i in range(side):
+            rays.append(((x0 + i, y0 - 1), (0, -1)))      # sopra
+            rays.append(((x0 + i, y0 + side), (0, 1)))    # sotto
+        for i in range(side):
+            rays.append(((x0 - 1, y0 + i), (-1, 0)))      # sinistra
+            rays.append(((x0 + side, y0 + i), (1, 0)))    # destra
+
+        result = []
+        # Per ogni raggio, calcola count e prima distanza per ogni label
+        for (sx, sy), (dx, dy) in rays:
+            # Inizializza dict per count e first_dist
+            counts = {lbl: 0 for lbl in labels}
+            first_dist = {lbl: None for lbl in labels}
+            # Scorri dalla cella adiacente fino al bordo
+            dist = 0
+            x, y = sx, sy
+            while 0 <= x < MAP_GRID_SIZE and 0 <= y < MAP_GRID_SIZE:
+                lbl = self.grid[y, x]
+                # Aggiorna count
+                if lbl in counts:
+                    counts[lbl] += 1
+                    # Se prima occorrenza, imposta first_dist
+                    if first_dist[lbl] is None:
+                        first_dist[lbl] = dist
+                # Avanza
+                x += dx
+                y += dy
+                dist += 1
+            # Costruisci lista fissa di tuple nell'ordine di 'labels'
+            ray_list = []
+            for lbl in labels:
+                count = counts.get(lbl, 0)
+                d = first_dist.get(lbl)
+                if d is None:
+                    d = dist  # se label non trovata, distanza al bordo
+                if count == 0:
+                    d = -1
+                ray_list.append((count, d))
+            result.append(ray_list)
+
+        return result

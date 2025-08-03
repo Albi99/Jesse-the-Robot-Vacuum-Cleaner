@@ -42,6 +42,11 @@ def main():
         if action is not None:
             rays, grid_status = robot.move(action)
             graphics.update(rays, grid_status)
+            view = robot.grid_view()
+            print(f'size: {len(view)}')
+            for v in view:
+                print(f'size: {len(v)}, view: {v}')
+
 
 
         # Random
