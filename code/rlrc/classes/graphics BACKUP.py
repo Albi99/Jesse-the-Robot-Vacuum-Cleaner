@@ -1,7 +1,7 @@
 import pygame
 import math
 
-from ..constants.configuration import ENVIRONMENT_SIZE, MAP_GRID_SIZE, CELL_SIDE, LABELS
+from ..constants.configuration import MAP_GRID_SIZE, CELL_SIDE, LABELS
 from ..constants.colors import YELLOW, BLACK, GRAY, WHITE, BLUE, GREEN, RED, TMP_BACKGROUND
 
 
@@ -13,20 +13,19 @@ class Graphics:
         pygame.init()
         pygame.display.set_caption("Robot Vacuum Prototype")
         self.font = pygame.font.Font(None, 20)
-        self.screen = pygame.display.set_mode((ENVIRONMENT_SIZE*2 + 150, ENVIRONMENT_SIZE + 100))
+        self.screen = pygame.display.set_mode((MAP_GRID_SIZE*2 + 150, MAP_GRID_SIZE + 100))
         self.clock = pygame.time.Clock()
                 
-    def update(self, rays, status):
-        grid_status, battery = status
+    def update(self, rays, grid_status):
         self.screen.fill(TMP_BACKGROUND)
         # Left: real environment
-        real_world_surface = self.screen.subsurface((50, 50, ENVIRONMENT_SIZE, ENVIRONMENT_SIZE))
+        real_world_surface = self.screen.subsurface((50, 50, MAP_GRID_SIZE, MAP_GRID_SIZE))
         real_world_surface.fill(WHITE)
         self._draw_walls(real_world_surface)
         self._draw_lidar(real_world_surface, rays)
         self._draw_robot(real_world_surface)
         # Right: internal map
-        internal_map_surface = self.screen.subsurface((ENVIRONMENT_SIZE + 100, 50, ENVIRONMENT_SIZE, ENVIRONMENT_SIZE))
+        internal_map_surface = self.screen.subsurface((MAP_GRID_SIZE + 100, 50, MAP_GRID_SIZE, MAP_GRID_SIZE))
         internal_map_surface.fill(WHITE)
         self._draw_map(internal_map_surface)
         self._draw_robot(internal_map_surface)
@@ -34,10 +33,7 @@ class Graphics:
 
         for i, (val, count) in enumerate(sorted(grid_status.items())):
             txt = self.font.render(f'({val}) {LABELS[val]}: {count}', True, BLACK)
-            self.screen.blit(txt, (ENVIRONMENT_SIZE + 150, 75 + 20*i))
-
-        txt = self.font.render(f'battery: {battery*100}', True, BLACK)
-        self.screen.blit(txt, (ENVIRONMENT_SIZE + 150, 75 + 20*len(grid_status)))
+            self.screen.blit(txt, (MAP_GRID_SIZE + 150, 75 + 20*i))
 
         pygame.display.flip()       # Update all the screen
         self.clock.tick(60)              # ~60 FPS

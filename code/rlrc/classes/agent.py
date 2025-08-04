@@ -2,12 +2,13 @@ import torch
 import random
 import numpy as np
 from collections import deque
+import pygame
 
-from model import Linear_QNet, QTrainer
+from .model import Linear_QNet, QTrainer
 from ..classes.environment import Environment
 from ..classes.robot import Robot
 from ..classes.graphics import Graphics, plot
-from ..constants.configuration import MAP_GRID_SIZE, ROBOT_RADIUS, ROBOT_SPEED, LIDAR_NUM_RAYS, LIDAR_MAX_DISTANCE, LABELS, CELL_SIDE
+from ..constants.configuration import ENVIRONMENT_SIZE, MAP_GRID_SIZE, ROBOT_RADIUS, ROBOT_SPEED, LIDAR_NUM_RAYS, LIDAR_MAX_DISTANCE, LABELS, CELL_SIDE
 from ..constants.maps import MAP_1, MAP_2, MAP_3, MAP_4
 
 
@@ -22,29 +23,28 @@ class Agent:
         self.epsilon = 0 # randomness
         self.gamma = 0.9 # discount rate
         self.memory = deque(maxlen=MAX_MEMORY) # popleft()
-        input_size = 65 * (2 * ROBOT_RADIUS // CELL_SIDE) + 1
+        n = len(LABELS)
+        cells_per_robot_side = (2 * ROBOT_RADIUS // CELL_SIDE)
+        input_size = int(2 + n + 4 * cells_per_robot_side * n * 2)
         hidden_layer_size = 256
         output_size = 4
+
         self.model = Linear_QNet(input_size, hidden_layer_size, output_size)
         self.trainer = QTrainer(self.model, lr=LEARNING_RATE, gamma=self.gamma)
 
 
     def get_state(self, robot):
         # current orientation
-        state = [robot.angle]
+        state = [robot.angle, robot.battery,]
         
         # grid status
         grid_status = [0] * len(LABELS)
-        for label, count in robot.grid_stats():
-            grid_status[label] = count
+        for label, count in robot.status()[0].items():
+            grid_status[label] = int(count)
         state += grid_status
 
         # side views
-        for side in range(4):
-            for cell in range(2 * ROBOT_RADIUS // CELL_SIDE):
-                for label in LABELS.keys():
-                    view = robot.
-                    state += []
+        state += robot.grid_view()
 
         return np.array(state, dtype=int)
 
@@ -69,7 +69,8 @@ class Agent:
 
         move = None
         if random.randint(0, 200) < self.epsilon:
-            move = random.choice(['up', 'down', 'left', 'right'])
+            # move = random.choice(['up', 'down', 'left', 'right']
+            move = random.randint(0, 3)     # right, down, left, up
         else:
             state0 = torch.tensor(state, dtype=torch.float)
             prediction = self.model(state0)
@@ -86,11 +87,22 @@ def train():
 
     environment = Environment(MAP_3)
     # il robot parte al centro della stanza
-    robot = Robot(MAP_GRID_SIZE//2, MAP_GRID_SIZE//2, ROBOT_RADIUS, ROBOT_SPEED, LIDAR_NUM_RAYS, LIDAR_MAX_DISTANCE, environment)
+    robot = Robot(ENVIRONMENT_SIZE//2, ENVIRONMENT_SIZE//2, ROBOT_RADIUS, ROBOT_SPEED, LIDAR_NUM_RAYS, LIDAR_MAX_DISTANCE, environment)
     graphics = Graphics(environment, robot)
-
     agent = Agent()
-    while True:
+
+    running = True
+    while running:
+        
+        # human interaction
+        action = None
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                running = False          # chiusura con “X”
+            elif event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_ESCAPE:
+                    running = False      # chiusura con Esc
+
         # get old state
         state_old = agent.get_state(robot)
 
@@ -98,8 +110,11 @@ def train():
         action = agent.get_action(state_old)
 
         # perform move and get new state
-        reward, done, score = robot.play_step(action)
+        reward, done, rays, grid_status = robot.play_step(action)
         state_new = agent.get_state(robot)
+
+        # update graphics
+        graphics.update(rays, grid_status)
 
         # train short memory
         agent.train_short_memory(state_old, action, reward, state_new, done)
@@ -107,23 +122,23 @@ def train():
         # remember
         agent.remember(state_old, action, reward, state_new, done)
 
-        if done:
-            # train long memory, plot result
-            robot.reset()
-            agent.n_games += 1
-            agent.train_long_memory()
+        # if done:
+        #     # train long memory, plot result
+        #     robot.reset()
+        #     agent.n_games += 1
+        #     agent.train_long_memory()
 
-            if score > record:
-                record = score
-                agent.model.save()
+        #     if score > record:
+        #         record = score
+        #         agent.model.save()
 
-            print('Game', agent.n_games, 'Score', score, 'Record:', record)
+        #     print('Game', agent.n_games, 'Score', score, 'Record:', record)
 
-            plot_scores.append(score)
-            total_score += score
-            mean_score = total_score / agent.n_games
-            plot_mean_scores.append(mean_score)
-            plot(plot_scores, plot_mean_scores)
+        #     plot_scores.append(score)
+        #     total_score += score
+        #     mean_score = total_score / agent.n_games
+        #     plot_mean_scores.append(mean_score)
+        #     plot(plot_scores, plot_mean_scores)
 
 
 if __name__ == '__main__':
