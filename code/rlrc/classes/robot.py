@@ -32,52 +32,6 @@ class Robot:
         self.total_reward = 0
         self.previus_grid = self.grid.copy()
 
-    # def _set_base(self):
-    #     # Determina la posizione della base in coordinate di cella
- 
-    #     # Calcola il centro "geometrico" della figura (media di tutti i punti dei muri)
-    #     pts = []
-    #     for x1,y1,x2,y2 in self.environment.walls:
-    #         pts.append((x1,y1))
-    #         pts.append((x2,y2))
-    #     cx = sum(x for x,y in pts) / len(pts)
-    #     cy = sum(y for x,y in pts) / len(pts)
-
-    #     # Scegli un segmento di muro interno (qualsiasi)
-    #     x1,y1,x2,y2 = random.choice(self.environment.walls)
-    #     # Punto medio del segmento
-    #     mx, my = (x1 + x2)/2, (y1 + y2)/2
-    #     # Direzione del segmento
-    #     dx, dy = x2 - x1, y2 - y1
-
-    #     # Costruiamo la normale al segmento e la normalizziamo
-    #     nx, ny = -dy, dx
-    #     length = math.hypot(nx, ny) or 1.0
-    #     nx, ny = nx/length, ny/length
-
-    #     # Definiamo l’offset in pixel pari a ceil(raggio/CELL_SIDE) celle
-    #     cells_in = math.ceil(self.radius / CELL_SIDE)
-    #     offset = cells_in * CELL_SIDE
-
-    #     # Calcoliamo le due possibili posizioni (normale e normale opposta)
-    #     px1, py1 = mx + nx * offset, my + ny * offset
-    #     px2, py2 = mx - nx * offset, my - ny * offset
-
-    #     # Scegliamo quella che è più vicina al centro (cioè il lato interno)
-    #     d1 = (px1 - cx) ** 2 + (py1 - cy) ** 2
-    #     d2 = (px2 - cx) ** 2 + (py2 - cy) ** 2
-    #     if d1 < d2:
-    #         px, py = px1, py1
-    #     else:
-    #         px, py = px2, py2
-
-    #     # Inizializza il robot esattamente al centro di quella cella (in pixel)
-    #     self.x = px
-    #     self.y = py
-
-    #     # etichetta le celle della base
-    #     self._footprint('base')
-
     def _set_base(self, base_position):
         if base_position is not None:
             self.x = base_position[0]
@@ -140,6 +94,33 @@ class Robot:
         # 7) footprint della base
         self._footprint('base')
 
+    def _back_in_base(self) -> bool:
+        """
+        Ritorna True se almeno la metà delle celle del quadrato
+        di ingombro del robot (footprint) sono etichettate come 'base'.
+        """
+        # centro in celle
+        cx = int(self.x // CELL_SIDE)
+        cy = int(self.y // CELL_SIDE)
+        # raggio in celle come da footprint
+        n = self.footprint_cells
+        # etichetta della base
+        base_lbl = LABELS_STR_TO_INT['base']
+        # conteggio celle totali e di quelle 'base'
+        total = (2*n + 1) ** 2
+        count_base = 0
+
+        for dy in range(-n, n+1):
+            for dx in range(-n, n+1):
+                xg = cx + dx
+                yg = cy + dy
+                if 0 <= xg < MAP_GRID_SIZE and 0 <= yg < MAP_GRID_SIZE:
+                    if self.grid[yg, xg] == base_lbl:
+                        count_base += 1
+
+        # almeno qualcosa %
+        return count_base >= total * 0.75
+
     def reset(self, x=ENVIRONMENT_SIZE//2, y=ENVIRONMENT_SIZE//2):
         self.step = 0
         self.battery = 1
@@ -160,7 +141,10 @@ class Robot:
         # status = self.status()
 
         done = False
-        if self.battery < self.delta_battery_per_step:
+        if self._back_in_base():
+            done = True
+            print('back un base')
+        elif self.battery < self.delta_battery_per_step:
             self.next_reward -= 100
             done = True
         
