@@ -7,7 +7,7 @@ from ..constants.colors import YELLOW, BLACK, GRAY, WHITE, BLUE, SKY_BLUE, GREEN
 from .environment import ray_segment_intersection
 
 class Robot:
-    def __init__(self, x, y, radius, speed, lidar_num_rays, lidar_max_distance, environment, battery=1, delta_battery_per_step=0.1):
+    def __init__(self, x, y, radius, speed, lidar_num_rays, lidar_max_distance, environment, battery=1, delta_battery_per_step=0.001):
         self.x = x  # coord in pixels [0..ENVIRONMENT_SIZE]
         self.y = y
         self.radius = radius
@@ -26,30 +26,36 @@ class Robot:
         self.battery = battery
         self.delta_battery_per_step = delta_battery_per_step
         self.next_reward = 0
+        self.total_reward = 0
         self.previus_grid = self.grid.copy()
+        
+    def reset(self, x=ENVIRONMENT_SIZE//2, y=ENVIRONMENT_SIZE//2):
+        self.step = 0
+        self.battery = 1
+        self.total_reward = 0
+        if x is not None: self.x = x
+        if y is not None: self.y = y
+        self.grid.fill(0)
 
     def play_step(self, action):
         self.next_reward = 0
         self.step += 1
-        self.move(ACTION_TO_STRING[action])
+        if not isinstance(action, str):
+            action = ACTION_TO_STRING[action]
+        d_collision_point, lidar_distances, rays, status = self.move(action)
         self.grid_diff()
         
-        rays = self._sense_lidar()
-        status = self.status()
+        # lidar_distances, rays = self._sense_lidar()
+        # status = self.status()
 
         done = False
         if self.battery < self.delta_battery_per_step:
             self.next_reward -= 100
             done = True
         
+        self.total_reward += self.next_reward
         # TODO: maybe add score = cleanded area / total area to clean
-        return self.next_reward, done, rays, status
-
-    def reset(self, x=ENVIRONMENT_SIZE//2, y=ENVIRONMENT_SIZE//2):
-        self.step = 0
-        if x is not None: self.x = x
-        if y is not None: self.y = y
-        self.grid.fill(0)
+        return self.next_reward, done, self.total_reward, d_collision_point, lidar_distances, rays, status
 
     def move(self, direction):
 
@@ -70,23 +76,24 @@ class Robot:
         # limiti mondo reale (pixel) da 0 a ENVIRONMENT_SIZE
         # (simulazioe dei sensori di contatto)
         if self._out_of_environment(nx, ny) or self._check_collision(nx, ny):
-            dnx, dny = nx // CELL_SIDE, ny // CELL_SIDE
-            print(f"Collision detected at, real coordinates: ({nx:.2f}, {ny:.2f}) ")
-            print(f"                           internal map: ({dnx}, {dny}) ")
+            d_collision_point_x, d_collision_point_y = nx // CELL_SIDE, ny // CELL_SIDE
+            # print(f"Collision detected at, real coordinates: ({nx:.2f}, {ny:.2f}) ")
+            # print(f"                           internal map: ({dnx}, {dny}) ")
             self.next_reward -= 5
         else:
+            d_collision_point_x, d_collision_point_y = -1, -1
             # commit e pulizia
             self.x, self.y = nx, ny
             self._clean()
         
-        rays = self._sense_lidar()
+        lidar_distances, rays = self._sense_lidar()
         status = self.status()
 
         self.battery -= self.delta_battery_per_step
         self.next_reward -= self.delta_battery_per_step
         if self.battery < 0.1:
             self.next_reward -= 2
-        return rays, status
+        return (d_collision_point_x, d_collision_point_y), lidar_distances, rays, status
 
     def move_random(self):
         self.move(random.uniform(-0.3, 0.3))
@@ -129,6 +136,7 @@ class Robot:
         return -1, None, None
 
     def _sense_lidar(self):
+        lidar_distances = []
         rays = []
         step_size = CELL_SIDE / 10
         for i in range(self.LIDAR_NUM_RAYS):
@@ -157,16 +165,18 @@ class Robot:
                         self.grid[gy, gx] = 1  # free
             # se c'è un impatto, segna l'ostacolo
             if dist >= 0 and hit_x is not None and hit_y is not None:
+                lidar_distances.append(dist)
                 gx = int((hit_x + self.epsilon) // CELL_SIDE)
                 gy = int((hit_y + self.epsilon) // CELL_SIDE)
                 if 0 <= gx < MAP_GRID_SIZE and 0 <= gy < MAP_GRID_SIZE:
                     self.grid[gy, gx] = -1  # static obstacle
             else:
+                lidar_distances.append(-1)
                 # questo mi serve per disegnare anche i raggi del LiDAR che non colpiscono niente
                 hit_x = self.x + math.cos(ray_angle) * self.LIDAR_MAX_DISTANCE
                 hit_y = self.y + math.sin(ray_angle) * self.LIDAR_MAX_DISTANCE
             rays.append((hit_x, hit_y))
-        return rays
+        return lidar_distances, rays
 
     def _clean(self):
         # robot position inside the internal map
@@ -195,8 +205,8 @@ class Robot:
         delta_clean = curr_three - prev_three
         # Aggiorna snapshot precedente
         self.previus_grid = curr.copy()
-        self.next_reward -= delta_unknow
-        self.next_reward += 2*delta_clean
+        self.next_reward -= delta_unknow / 10
+        self.next_reward += delta_clean
 
     def status(self):
         unique, counts = np.unique(self.grid, return_counts=True)

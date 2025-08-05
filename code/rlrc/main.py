@@ -38,9 +38,9 @@ def main():
 
         if action is not None:
             # rays, status = robot.move(action)
-            rays, status = robot.play_step(action)
-            graphics.update(rays, status)
-            # print(robot.next_reward)
+            reward, done, score, d_collision_point, lidar_distances, rays, grid_status = robot.play_step(action)
+            graphics.update(rays, grid_status, score)
+            print(f'action: {action}, reward: {robot.next_reward}')
 
 
 

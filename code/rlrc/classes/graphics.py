@@ -16,7 +16,7 @@ class Graphics:
         self.screen = pygame.display.set_mode((ENVIRONMENT_SIZE*2 + 150, ENVIRONMENT_SIZE + 100))
         self.clock = pygame.time.Clock()
                 
-    def update(self, rays, status):
+    def update(self, rays, status, score):
         grid_status, battery = status
         self.screen.fill(TMP_BACKGROUND)
         # Left: real environment
@@ -32,12 +32,18 @@ class Graphics:
         self._draw_robot(internal_map_surface)
         # robot.draw_lidar(internal_map_surface, rays)
 
+        # grid status
         for i, (val, count) in enumerate(sorted(grid_status.items())):
-            txt = self.font.render(f'({val}) {LABELS[val]}: {count}', True, BLACK)
+            txt = self.font.render(f'{LABELS[val]}: {count}', True, BLACK)
             self.screen.blit(txt, (ENVIRONMENT_SIZE + 150, 75 + 20*i))
 
-        txt = self.font.render(f'battery: {battery*100}', True, BLACK)
+        # battery
+        txt = self.font.render(f'battery: {round(battery*100, 2)}%', True, BLACK)
         self.screen.blit(txt, (ENVIRONMENT_SIZE + 150, 75 + 20*len(grid_status)))
+
+        # score
+        txt = self.font.render(f'score: {score}', True, BLACK)
+        self.screen.blit(txt, (ENVIRONMENT_SIZE + 150, 75 + 20*len(grid_status) + 20))
 
         pygame.display.flip()       # Update all the screen
         self.clock.tick(60)              # ~60 FPS
@@ -90,6 +96,9 @@ class Graphics:
 
 
 
+################################
+
+
 import matplotlib.pyplot as plt
 from IPython import display
 
@@ -104,7 +113,7 @@ def plot(scores, mean_scores):
     plt.ylabel('Score')
     plt.plot(scores)
     plt.plot(mean_scores)
-    plt.ylim(ymin=0)
+    # plt.ylim(ymin=0)
     plt.text(len(scores)-1, scores[-1], str(scores[-1]))
     plt.text(len(mean_scores)-1, mean_scores[-1], str(mean_scores[-1]))
     plt.show(block=False)
