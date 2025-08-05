@@ -8,7 +8,7 @@ from .model import Linear_QNet, QTrainer
 from ..classes.environment import Environment
 from ..classes.robot import Robot
 from ..classes.graphics import Graphics, plot
-from ..constants.configuration import ENVIRONMENT_SIZE, MAP_GRID_SIZE, ROBOT_RADIUS, ROBOT_SPEED, LIDAR_NUM_RAYS, LIDAR_MAX_DISTANCE, LABELS, CELL_SIDE
+from ..constants.configuration import ENVIRONMENT_SIZE, MAP_GRID_SIZE, ROBOT_RADIUS, ROBOT_SPEED, LIDAR_NUM_RAYS, LIDAR_MAX_DISTANCE, LABELS_INT_TO_STR, CELL_SIDE
 from ..constants.maps import MAP_1, MAP_2, MAP_3, MAP_4
 
 
@@ -23,7 +23,7 @@ class Agent:
         self.epsilon = 0 # randomness
         self.gamma = 0.9 # discount rate
         self.memory = deque(maxlen=MAX_MEMORY) # popleft()
-        n = len(LABELS)
+        n = len(LABELS_INT_TO_STR)
         cells_per_robot_side = (2 * ROBOT_RADIUS // CELL_SIDE)
         input_size = int(4 + LIDAR_NUM_RAYS + n + 4 * cells_per_robot_side * n * 2)
         hidden_layer_size = 256
@@ -41,7 +41,7 @@ class Agent:
         state += list(d_collision_point) + lidar_distances
         
         # grid status
-        grid_status = [0] * len(LABELS)
+        grid_status = [0] * len(LABELS_INT_TO_STR)
         for label, count in robot.status()[0].items():
             grid_status[label] = int(count)
         state += grid_status

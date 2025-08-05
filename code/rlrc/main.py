@@ -11,12 +11,11 @@ def main():
 
     environment = Environment(MAP_3)
     # il robot parte al centro della stanza
-    robot = Robot(ENVIRONMENT_SIZE//2, ENVIRONMENT_SIZE//2, ROBOT_RADIUS, ROBOT_SPEED, LIDAR_NUM_RAYS, LIDAR_MAX_DISTANCE, environment)
+    robot = Robot(ROBOT_RADIUS, ROBOT_SPEED, LIDAR_NUM_RAYS, LIDAR_MAX_DISTANCE, environment)
     graphics = Graphics(environment, robot)
 
     running = True
     while running:
-
 
         # Human
         action = None

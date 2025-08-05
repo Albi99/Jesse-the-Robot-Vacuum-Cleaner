@@ -1,25 +1,28 @@
 import numpy as np
 import math
 import random
+import math, random
+from collections import deque
 
-from ..constants.configuration import ENVIRONMENT_SIZE, MAP_GRID_SIZE, CELL_SIDE, LABELS, ACTION_TO_STRING
-from ..constants.colors import YELLOW, BLACK, GRAY, WHITE, BLUE, SKY_BLUE, GREEN, RED
+from ..constants.configuration import ENVIRONMENT_SIZE, MAP_GRID_SIZE, CELL_SIDE, LABELS_INT_TO_STR, LABELS_STR_TO_INT, ACTION_TO_STRING
 from .environment import ray_segment_intersection
+from ..utils import point_in_poly
+
 
 class Robot:
-    def __init__(self, x, y, radius, speed, lidar_num_rays, lidar_max_distance, environment, battery=1, delta_battery_per_step=0.001):
-        self.x = x  # coord in pixels [0..ENVIRONMENT_SIZE]
-        self.y = y
+    def __init__(self, radius, speed, lidar_num_rays, lidar_max_distance, environment, battery=1, delta_battery_per_step=0.001, base_position=None):
+        # internal occupancy grid
+        self.grid = np.full((MAP_GRID_SIZE, MAP_GRID_SIZE), 0, dtype=np.int16)
         self.radius = radius
-        # footprint in cells for cleaning
+        # footprint in cells
         self.footprint_cells = int(math.ceil(self.radius / CELL_SIDE)) - 1
+        self.environment = environment
+        # charging base and robot position
+        self._set_base(base_position)
         self.speed = speed
         self.LIDAR_NUM_RAYS = lidar_num_rays
         self.LIDAR_MAX_DISTANCE = lidar_max_distance
-        self.environment = environment
         self.angle = 0  # random.uniform(0, 2*math.pi)
-        # internal occupancy grid
-        self.grid = np.full((MAP_GRID_SIZE, MAP_GRID_SIZE), 0, dtype=np.int16)
         self.epsilon = 1e-6
 
         self.step = 0
@@ -28,7 +31,115 @@ class Robot:
         self.next_reward = 0
         self.total_reward = 0
         self.previus_grid = self.grid.copy()
-        
+
+    # def _set_base(self):
+    #     # Determina la posizione della base in coordinate di cella
+ 
+    #     # Calcola il centro "geometrico" della figura (media di tutti i punti dei muri)
+    #     pts = []
+    #     for x1,y1,x2,y2 in self.environment.walls:
+    #         pts.append((x1,y1))
+    #         pts.append((x2,y2))
+    #     cx = sum(x for x,y in pts) / len(pts)
+    #     cy = sum(y for x,y in pts) / len(pts)
+
+    #     # Scegli un segmento di muro interno (qualsiasi)
+    #     x1,y1,x2,y2 = random.choice(self.environment.walls)
+    #     # Punto medio del segmento
+    #     mx, my = (x1 + x2)/2, (y1 + y2)/2
+    #     # Direzione del segmento
+    #     dx, dy = x2 - x1, y2 - y1
+
+    #     # Costruiamo la normale al segmento e la normalizziamo
+    #     nx, ny = -dy, dx
+    #     length = math.hypot(nx, ny) or 1.0
+    #     nx, ny = nx/length, ny/length
+
+    #     # Definiamo l’offset in pixel pari a ceil(raggio/CELL_SIDE) celle
+    #     cells_in = math.ceil(self.radius / CELL_SIDE)
+    #     offset = cells_in * CELL_SIDE
+
+    #     # Calcoliamo le due possibili posizioni (normale e normale opposta)
+    #     px1, py1 = mx + nx * offset, my + ny * offset
+    #     px2, py2 = mx - nx * offset, my - ny * offset
+
+    #     # Scegliamo quella che è più vicina al centro (cioè il lato interno)
+    #     d1 = (px1 - cx) ** 2 + (py1 - cy) ** 2
+    #     d2 = (px2 - cx) ** 2 + (py2 - cy) ** 2
+    #     if d1 < d2:
+    #         px, py = px1, py1
+    #     else:
+    #         px, py = px2, py2
+
+    #     # Inizializza il robot esattamente al centro di quella cella (in pixel)
+    #     self.x = px
+    #     self.y = py
+
+    #     # etichetta le celle della base
+    #     self._footprint('base')
+
+    def _set_base(self, base_position):
+        if base_position is not None:
+            self.x = base_position[0]
+            self.y = base_position[1]
+        else:
+            N = MAP_GRID_SIZE
+            # offset interno rispetto al muro
+            cells_in = math.ceil(self.radius / CELL_SIDE) + 1
+
+            # 1) Raccogliamo il poligono ordinato dei muri
+            poly = self.environment.walls
+
+            # 2) Creiamo la mask booleana delle celle interne
+            interior = [[False]*N for _ in range(N)]
+            for gy in range(N):
+                for gx in range(N):
+                    px = (gx + 0.5) * CELL_SIDE
+                    py = (gy + 0.5) * CELL_SIDE
+                    if point_in_poly(px, py, poly):
+                        interior[gy][gx] = True
+
+            # 3) BFS multi‐sorgente per calcolare la distanza (in celle) di ogni cella interna dal bordo
+            dist = [[math.inf]*N for _ in range(N)]
+            dq = deque()
+            # mettiamo in coda tutte le celle “esterne” a dist=0
+            for gy in range(N):
+                for gx in range(N):
+                    if not interior[gy][gx]:
+                        dist[gy][gx] = 0
+                        dq.append((gy, gx))
+            # passi 4‐connessi
+            dirs = [(1,0),(-1,0),(0,1),(0,-1)]
+            while dq:
+                y, x = dq.popleft()
+                for dy, dx in dirs:
+                    ny, nx = y+dy, x+dx
+                    if 0 <= ny < N and 0 <= nx < N and dist[ny][nx] == math.inf:
+                        # possiamo attraversare solo celle interne
+                        if interior[ny][nx]:
+                            dist[ny][nx] = dist[y][x] + 1
+                            dq.append((ny, nx))
+
+            # 4) Troviamo tutte le celle a distanza ESATTAMENTE cells_in
+            candidates = [
+                (gy, gx)
+                for gy in range(N)
+                for gx in range(N)
+                if interior[gy][gx] and dist[gy][gx] == cells_in
+            ]
+            if not candidates:
+                raise RuntimeError("Nessuna cella valida trovata per la base con raggio = %d celle" % cells_in)
+
+            # 5) Scegliamo una cella a caso come centro della base
+            gy, gx = random.choice(candidates)
+
+            # 6) Posizioniamo il robot al centro di quella cella (in pixel)
+            self.x = (gx + 0.5) * CELL_SIDE
+            self.y = (gy + 0.5) * CELL_SIDE
+
+        # 7) footprint della base
+        self._footprint('base')
+
     def reset(self, x=ENVIRONMENT_SIZE//2, y=ENVIRONMENT_SIZE//2):
         self.step = 0
         self.battery = 1
@@ -84,7 +195,8 @@ class Robot:
             d_collision_point_x, d_collision_point_y = -1, -1
             # commit e pulizia
             self.x, self.y = nx, ny
-            self._clean()
+            # etichetta le celle pultie
+            self._footprint('clean')
         
         lidar_distances, rays = self._sense_lidar()
         status = self.status()
@@ -161,15 +273,15 @@ class Robot:
                         gy += 1
                     else:
                         gy -= 1
-                    if self.grid[gy, gx] < 2:
-                        self.grid[gy, gx] = 1  # free
+                    if self.grid[gy, gx] < LABELS_STR_TO_INT['clean']:
+                        self.grid[gy, gx] = LABELS_STR_TO_INT['free']
             # se c'è un impatto, segna l'ostacolo
             if dist >= 0 and hit_x is not None and hit_y is not None:
                 lidar_distances.append(dist)
                 gx = int((hit_x + self.epsilon) // CELL_SIDE)
                 gy = int((hit_y + self.epsilon) // CELL_SIDE)
                 if 0 <= gx < MAP_GRID_SIZE and 0 <= gy < MAP_GRID_SIZE:
-                    self.grid[gy, gx] = -1  # static obstacle
+                    self.grid[gy, gx] = LABELS_STR_TO_INT['static obstacle']
             else:
                 lidar_distances.append(-1)
                 # questo mi serve per disegnare anche i raggi del LiDAR che non colpiscono niente
@@ -178,7 +290,7 @@ class Robot:
             rays.append((hit_x, hit_y))
         return lidar_distances, rays
 
-    def _clean(self):
+    def _footprint(self, label):
         # robot position inside the internal map
         robot_center_gx = int(self.x//CELL_SIDE);
         robot_center_gy = int(self.y//CELL_SIDE)
@@ -186,7 +298,10 @@ class Robot:
             for dy in range(-self.footprint_cells, self.footprint_cells+1):
                 gx, gy = robot_center_gx+dx, robot_center_gy+dy
                 if 0<=gx<MAP_GRID_SIZE and 0<=gy<MAP_GRID_SIZE:
-                    self.grid[gy,gx] = 3
+                    if label == 'base':
+                        self.grid[gy,gx] = LABELS_STR_TO_INT[label]
+                    elif label == 'clean' and self.grid[gy, gx] != LABELS_STR_TO_INT['base']:
+                        self.grid[gy,gx] = LABELS_STR_TO_INT[label]
     
     def grid_diff(self):
         """
@@ -196,13 +311,13 @@ class Robot:
         prev = self.previus_grid
         curr = self.grid
         # Conta occorrenze per label 0 e 3
-        prev_zero = int((prev == 0).sum())
-        curr_zero = int((curr == 0).sum())
-        prev_three = int((prev == 3).sum())
-        curr_three = int((curr == 3).sum())
+        prev_unknown = int((prev == LABELS_STR_TO_INT['unknown']).sum())
+        curr_unknown = int((curr == LABELS_STR_TO_INT['unknown']).sum())
+        prev_clean = int((prev == LABELS_STR_TO_INT['clean']).sum())
+        curr_clean = int((curr == LABELS_STR_TO_INT['clean']).sum())
         # Calcola delta
-        delta_unknow = curr_zero - prev_zero
-        delta_clean = curr_three - prev_three
+        delta_unknow = curr_unknown - prev_unknown
+        delta_clean = curr_clean - prev_clean
         # Aggiorna snapshot precedente
         self.previus_grid = curr.copy()
         self.next_reward -= delta_unknow / 10
@@ -214,7 +329,7 @@ class Robot:
     
     def grid_view(self):
         # Parametri di griglia e label
-        labels = LABELS.keys()
+        labels = LABELS_INT_TO_STR.keys()
 
         # Calcola bounding square in celle
         radius_cells = self.radius / CELL_SIDE

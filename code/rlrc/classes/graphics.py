@@ -1,7 +1,7 @@
 import pygame
 import math
 
-from ..constants.configuration import ENVIRONMENT_SIZE, MAP_GRID_SIZE, CELL_SIDE, LABELS
+from ..constants.configuration import ENVIRONMENT_SIZE, MAP_GRID_SIZE, CELL_SIDE, LABELS_INT_TO_STR, LABELS_STR_TO_INT
 from ..constants.colors import YELLOW, BLACK, GRAY, WHITE, BLUE, GREEN, RED, TMP_BACKGROUND
 
 
@@ -34,16 +34,16 @@ class Graphics:
 
         # grid status
         for i, (val, count) in enumerate(sorted(grid_status.items())):
-            txt = self.font.render(f'{LABELS[val]}: {count}', True, BLACK)
-            self.screen.blit(txt, (ENVIRONMENT_SIZE + 150, 75 + 20*i))
+            txt = self.font.render(f'{LABELS_INT_TO_STR[int(val)]}: {count}', True, BLACK)
+            self.screen.blit(txt, (ENVIRONMENT_SIZE + 150, 25 + 20*i))
 
         # battery
         txt = self.font.render(f'battery: {round(battery*100, 2)}%', True, BLACK)
-        self.screen.blit(txt, (ENVIRONMENT_SIZE + 150, 75 + 20*len(grid_status)))
+        self.screen.blit(txt, (ENVIRONMENT_SIZE + 150, 25 + 20*len(grid_status)))
 
         # score
         txt = self.font.render(f'score: {score}', True, BLACK)
-        self.screen.blit(txt, (ENVIRONMENT_SIZE + 150, 75 + 20*len(grid_status) + 20))
+        self.screen.blit(txt, (ENVIRONMENT_SIZE + 150, 25 + 20*len(grid_status) + 20))
 
         pygame.display.flip()       # Update all the screen
         self.clock.tick(60)              # ~60 FPS
@@ -76,18 +76,16 @@ class Graphics:
         for y in range(MAP_GRID_SIZE):
             for x in range(MAP_GRID_SIZE):
                 val = self.robot.grid[y, x]
-                if val == -2:
-                    color = YELLOW      # dynamics obstacol
-                elif val == -1:
-                    color = BLACK       # staic obstacle
-                elif val == 0:
-                    color = GRAY        # unknown
-                elif val == 1:
-                    color = WHITE       # free
-                elif val == 2:
-                    color = BLUE        # robot base
-                elif val == 3:
-                    color = GREEN       # cleaned
+                if val == LABELS_STR_TO_INT['static obstacle']:
+                    color = BLACK
+                elif val == LABELS_STR_TO_INT['unknown']:
+                    color = GRAY
+                elif val == LABELS_STR_TO_INT['free']:
+                    color = WHITE
+                elif val == LABELS_STR_TO_INT['clean']:
+                    color = GREEN
+                elif val == LABELS_STR_TO_INT['base']:
+                    color = BLUE
                 else:
                     color = RED          # re-cleaned
 
