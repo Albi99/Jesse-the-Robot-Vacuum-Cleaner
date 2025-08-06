@@ -1,5 +1,6 @@
 import pygame
 import math
+import numpy as np
 
 from ..constants.configuration import ENVIRONMENT_SIZE, MAP_GRID_SIZE, CELL_SIDE, LABELS_INT_TO_STR, LABELS_STR_TO_INT
 from ..constants.colors import YELLOW, BLACK, GRAY, WHITE, BLUE, GREEN, RED, TMP_BACKGROUND
@@ -41,9 +42,20 @@ class Graphics:
         txt = self.font.render(f'battery: {round(battery*100, 2)}%', True, BLACK)
         self.screen.blit(txt, (ENVIRONMENT_SIZE + 150, 35 + 20*len(grid_status)))
 
-        # score
-        txt = self.font.render(f'score: {score}', True, BLACK)
+        # total reward
+        txt = self.font.render(f'total reward: {score}', True, BLACK)
         self.screen.blit(txt, (ENVIRONMENT_SIZE + 150, 35 + 20*len(grid_status) + 20))
+
+        # % clean over free
+        clean_key = np.int16(LABELS_STR_TO_INT['clean'])
+        if clean_key in grid_status:
+            clean = grid_status[clean_key]
+        else:
+            clean = 0
+        free = grid_status[np.int16(LABELS_STR_TO_INT['free'])]
+        clean_over_free = round(clean / free * 100, 2)
+        txt = self.font.render(f'clean over free: {clean_over_free} %', True, BLACK)
+        self.screen.blit(txt, (ENVIRONMENT_SIZE + 150, 35 + 20*len(grid_status) + 40))
 
         pygame.display.flip()       # Update all the screen
         self.clock.tick(60)              # ~60 FPS

@@ -132,6 +132,7 @@ class Robot:
     def reset(self, base_position=None):
         self.total_reward = 0
         self.grid.fill(0)
+        self.previus_grid = self.grid.copy()
         self._set_base(base_position)
         self.step = 0
         self.battery = 1
@@ -147,8 +148,17 @@ class Robot:
         done = False
         if self._back_in_base():
             done = True
-            print('back un base')
+            if self.battery < .1:
+                # if come back in base with less then 10% battery
+                self.next_reward -= 20
+            elif self.battery < .2:
+                # if come back in base with less then 20% battery
+                self.next_reward -= 10
+            else:
+                # if come back in base with 20% or more battery
+                self.next_reward += 10
         elif self.battery < self.delta_battery_per_step:
+            # se non rientra in base
             self.next_reward -= 100
             done = True
         
@@ -190,9 +200,10 @@ class Robot:
         status = self.status()
 
         self.battery -= self.delta_battery_per_step
-        self.next_reward -= self.delta_battery_per_step
-        if self.battery < 0.2:
-            self.next_reward -= 2
+        # penality for each step
+        self.next_reward -= 1
+        # if self.battery < 0.2:
+        #     self.next_reward -= 2
         return (d_collision_point_x, d_collision_point_y), lidar_distances, rays, status
 
     def move_random(self):
@@ -308,9 +319,9 @@ class Robot:
         delta_clean = curr_clean - prev_clean
         # Aggiorna snapshot precedente
         self.previus_grid = curr.copy()
-        self.next_reward -= delta_unknow / 10
-        self.next_reward += delta_clean * 3
-
+        self.next_reward += - delta_unknow
+        self.next_reward += delta_clean * 2
+ 
     def status(self):
         unique, counts = np.unique(self.grid, return_counts=True)
         return dict(zip(unique, counts)), self.battery
@@ -374,10 +385,10 @@ class Robot:
 
         return flat_view
 
-    def _extract_submatrix_flat(self):
+    def _extract_submatrix_flat(self, offset=10):
         """
         Estrae una sottomatrice quadrata centrata sulla cella del robot con metà-lato
-        pari al raggio in celle + 50, riempiendo con -999 le celle fuori grid.
+        pari al raggio in celle + offset, riempiendo con -999 le celle fuori grid.
         Rimuove quindi le 81 celle del quadrato centrale (9x9) e restituisce
         una lista piatta di interi.
         """
@@ -388,8 +399,8 @@ class Robot:
 
         # Raggio in celle (arrotondato per eccesso)
         cell_radius = int(math.ceil(self.radius / CELL_SIDE))
-        # Estensione desiderata: raggio + 50 celle
-        half_ext = cell_radius + 50
+        # Estensione desiderata: raggio + 10 celle (50 centimetri)
+        half_ext = cell_radius + offset
         size = 2 * half_ext + 1
 
         # Inizializza sottomatrice con valore di padding

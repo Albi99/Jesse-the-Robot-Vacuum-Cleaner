@@ -39,6 +39,7 @@ def main():
             # rays, status = robot.move(action)
             reward, done, score, d_collision_point, lidar_distances, rays, grid_status = robot.play_step(action)
             graphics.update(rays, grid_status, score)
+            # print(robot._extract_submatrix_flat())
             print(f'action: {action}, reward: {robot.next_reward}')
 
 

@@ -20,13 +20,13 @@ class Agent:
         self.gamma = 0.9 # discount rate
         self.memory = deque(maxlen=MAX_MEMORY) # popleft()
 
-        n = len(LABELS_INT_TO_STR)
-        cells_per_robot_side = (2 * ROBOT_RADIUS // CELL_SIDE)
-        input_size = int(4 + LIDAR_NUM_RAYS + n + 4 * cells_per_robot_side * n * 2) # 405
-        hidden_layer_size = 256
+        # n = len(LABELS_INT_TO_STR)
+        # cells_per_robot_side = (2 * ROBOT_RADIUS // CELL_SIDE)
+        # input_size = int(4 + LIDAR_NUM_RAYS + n + 4 * cells_per_robot_side * n * 2) # 405
+        input_size = 1285 # 405 + 760 (+ 1200) = 1285
         output_size = 4
 
-        self.model = Linear_QNet(input_size, hidden_layer_size, output_size)
+        self.model = Linear_QNet(input_size, output_size)
         self.trainer = QTrainer(self.model, lr=LEARNING_RATE, gamma=self.gamma)
 
 
@@ -44,6 +44,9 @@ class Agent:
             counter -= 1
         for _ in range(counter):
             state += [0]
+
+        # (sub)grid views
+        state += robot._extract_submatrix_flat()
 
         # side views
         state += robot.grid_view()
