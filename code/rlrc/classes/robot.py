@@ -5,12 +5,20 @@ import math, random
 from collections import deque
 
 from ..constants.configuration import ENVIRONMENT_SIZE, MAP_GRID_SIZE, CELL_SIDE, LABELS_INT_TO_STR, LABELS_STR_TO_INT, ACTION_TO_STRING
-from .environment import ray_segment_intersection
-from ..utils import point_in_poly
+from ..utils import point_in_poly, ray_segment_intersection
 
 
 class Robot:
-    def __init__(self, radius, speed, lidar_num_rays, lidar_max_distance, environment, battery=1, delta_battery_per_step=0.001, base_position=None):
+    def __init__(self, 
+                 radius, 
+                 speed, 
+                 lidar_num_rays, 
+                 lidar_max_distance, 
+                 environment, 
+                 battery=1, 
+                 delta_battery_per_step=0.001,   # autonomia: 50 metri = 1000 steps
+                 base_position=None
+                 ):
         # internal occupancy grid
         self.grid = np.full((MAP_GRID_SIZE, MAP_GRID_SIZE), 0, dtype=np.int16)
         self.radius = radius
@@ -22,7 +30,7 @@ class Robot:
         self.speed = speed
         self.LIDAR_NUM_RAYS = lidar_num_rays
         self.LIDAR_MAX_DISTANCE = lidar_max_distance
-        self.angle = 0  # random.uniform(0, 2*math.pi)
+        self.angle = random.randint(0, 3)  # random.uniform(0, 2*math.pi)
         self.epsilon = 1e-6
 
         self.step = 0
@@ -32,7 +40,7 @@ class Robot:
         self.total_reward = 0
         self.previus_grid = self.grid.copy()
 
-    def _set_base(self, base_position):
+    def _set_base(self, base_position=None):
         if base_position is not None:
             self.x = base_position[0]
             self.y = base_position[1]
@@ -119,15 +127,14 @@ class Robot:
                         count_base += 1
 
         # almeno qualcosa %
-        return count_base >= total * 0.75
+        return count_base >= total * 0.75 and self.step > 3
 
-    def reset(self, x=ENVIRONMENT_SIZE//2, y=ENVIRONMENT_SIZE//2):
+    def reset(self, base_position=None):
+        self.total_reward = 0
+        self.grid.fill(0)
+        self._set_base(base_position)
         self.step = 0
         self.battery = 1
-        self.total_reward = 0
-        if x is not None: self.x = x
-        if y is not None: self.y = y
-        self.grid.fill(0)
 
     def play_step(self, action):
         self.next_reward = 0
@@ -136,9 +143,6 @@ class Robot:
             action = ACTION_TO_STRING[action]
         d_collision_point, lidar_distances, rays, status = self.move(action)
         self.grid_diff()
-        
-        # lidar_distances, rays = self._sense_lidar()
-        # status = self.status()
 
         done = False
         if self._back_in_base():
@@ -187,7 +191,7 @@ class Robot:
 
         self.battery -= self.delta_battery_per_step
         self.next_reward -= self.delta_battery_per_step
-        if self.battery < 0.1:
+        if self.battery < 0.2:
             self.next_reward -= 2
         return (d_collision_point_x, d_collision_point_y), lidar_distances, rays, status
 
@@ -305,7 +309,7 @@ class Robot:
         # Aggiorna snapshot precedente
         self.previus_grid = curr.copy()
         self.next_reward -= delta_unknow / 10
-        self.next_reward += delta_clean
+        self.next_reward += delta_clean * 3
 
     def status(self):
         unique, counts = np.unique(self.grid, return_counts=True)
@@ -369,3 +373,47 @@ class Robot:
             flat_view = [v for ray in result for (c, d) in ray for v in (c, d)]
 
         return flat_view
+
+    def _extract_submatrix_flat(self):
+        """
+        Estrae una sottomatrice quadrata centrata sulla cella del robot con metà-lato
+        pari al raggio in celle + 50, riempiendo con -999 le celle fuori grid.
+        Rimuove quindi le 81 celle del quadrato centrale (9x9) e restituisce
+        una lista piatta di interi.
+        """
+
+        # Calcola centro in coordinate di cella
+        cx = int(self.x // CELL_SIDE)
+        cy = int(self.y // CELL_SIDE)
+
+        # Raggio in celle (arrotondato per eccesso)
+        cell_radius = int(math.ceil(self.radius / CELL_SIDE))
+        # Estensione desiderata: raggio + 50 celle
+        half_ext = cell_radius + 50
+        size = 2 * half_ext + 1
+
+        # Inizializza sottomatrice con valore di padding
+        subm = np.full((size, size), -999, dtype=self.grid.dtype)
+
+        # Indici di partenza sulla grid originale
+        x0 = cx - half_ext
+        y0 = cy - half_ext
+
+        # Copia i valori validi
+        for i in range(size):
+            for j in range(size):
+                gx = x0 + j
+                gy = y0 + i
+                if 0 <= gx < self.grid.shape[1] and 0 <= gy < self.grid.shape[0]:
+                    subm[i, j] = self.grid[gy, gx]
+
+        # Rimuovi quadrato centrale 9x9
+        c0 = half_ext - 4
+        c1 = half_ext + 5
+        # Maschera per celle da mantenere
+        mask = np.ones_like(subm, dtype=bool)
+        mask[c0:c1, c0:c1] = False
+
+        # Flatten e ritorna lista
+        flat = subm[mask].astype(int).tolist()
+        return flat

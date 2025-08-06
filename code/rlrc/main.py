@@ -3,7 +3,7 @@ import pygame
 from .classes.environment import Environment
 from .classes.robot import Robot
 from .classes.graphics import Graphics
-from .constants.configuration import ENVIRONMENT_SIZE, MAP_GRID_SIZE, ROBOT_RADIUS, ROBOT_SPEED, LIDAR_NUM_RAYS, LIDAR_MAX_DISTANCE
+from .constants.configuration import ROBOT_RADIUS, ROBOT_SPEED, LIDAR_NUM_RAYS, LIDAR_MAX_DISTANCE
 from .constants.maps import MAP_1, MAP_2, MAP_3, MAP_4
 
 

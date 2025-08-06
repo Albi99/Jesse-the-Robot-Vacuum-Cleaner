@@ -9,7 +9,7 @@ class Linear_QNet(nn.Module):
         super().__init__()
         self.linear1 = nn.Linear(input_size, hidden_size)
         self.linear2 = nn.Linear(hidden_size, output_size)
-
+        
     def forward(self, x):
         x = F.relu(self.linear1(x))
         x = self.linear2(x)
@@ -56,7 +56,9 @@ class QTrainer:
             if not done[idx]:
                 Q_new = reward[idx] + self.gamma * torch.max(self.model(next_state[idx]))
 
-            target[idx][torch.argmax(action[idx]).item()] = Q_new
+            # target[idx][torch.argmax(action[idx]).item()] = Q_new
+            idx_action = action[idx].item() # so 0, 1, 2, or 3
+            target[idx][idx_action] = Q_new
     
         # 2: Q_new = r + y * max(next_predicted Q value) -> only do this if not done
         # pred.clone()

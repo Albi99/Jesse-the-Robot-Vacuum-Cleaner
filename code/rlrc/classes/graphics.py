@@ -35,15 +35,15 @@ class Graphics:
         # grid status
         for i, (val, count) in enumerate(sorted(grid_status.items())):
             txt = self.font.render(f'{LABELS_INT_TO_STR[int(val)]}: {count}', True, BLACK)
-            self.screen.blit(txt, (ENVIRONMENT_SIZE + 150, 25 + 20*i))
+            self.screen.blit(txt, (ENVIRONMENT_SIZE + 150, 35 + 20*i))
 
         # battery
         txt = self.font.render(f'battery: {round(battery*100, 2)}%', True, BLACK)
-        self.screen.blit(txt, (ENVIRONMENT_SIZE + 150, 25 + 20*len(grid_status)))
+        self.screen.blit(txt, (ENVIRONMENT_SIZE + 150, 35 + 20*len(grid_status)))
 
         # score
         txt = self.font.render(f'score: {score}', True, BLACK)
-        self.screen.blit(txt, (ENVIRONMENT_SIZE + 150, 25 + 20*len(grid_status) + 20))
+        self.screen.blit(txt, (ENVIRONMENT_SIZE + 150, 35 + 20*len(grid_status) + 20))
 
         pygame.display.flip()       # Update all the screen
         self.clock.tick(60)              # ~60 FPS
@@ -91,28 +91,3 @@ class Graphics:
 
                 rect = pygame.Rect(x*CELL_SIDE, y*CELL_SIDE, CELL_SIDE, CELL_SIDE)
                 pygame.draw.rect(surface, color, rect)
-
-
-
-################################
-
-
-import matplotlib.pyplot as plt
-from IPython import display
-
-plt.ion()
-
-def plot(scores, mean_scores):
-    display.clear_output(wait=True)
-    display.display(plt.gcf())
-    plt.clf()
-    plt.title('Training...')
-    plt.xlabel('Number of Games')
-    plt.ylabel('Score')
-    plt.plot(scores)
-    plt.plot(mean_scores)
-    # plt.ylim(ymin=0)
-    plt.text(len(scores)-1, scores[-1], str(scores[-1]))
-    plt.text(len(mean_scores)-1, mean_scores[-1], str(mean_scores[-1]))
-    plt.show(block=False)
-    plt.pause(.1)

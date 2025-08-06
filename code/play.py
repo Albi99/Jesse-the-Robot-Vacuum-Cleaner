@@ -1,6 +1,6 @@
 from rlrc.main import main
-from rlrc.classes.agent import train
+from rlrc.train import train
 
 if __name__ == "__main__":
-    main()
-    # train()
+    # main()
+    train()
