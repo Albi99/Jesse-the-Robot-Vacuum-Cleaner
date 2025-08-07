@@ -2,8 +2,8 @@ import pygame
 import math
 import numpy as np
 
-from ..constants.configuration import ENVIRONMENT_SIZE, MAP_GRID_SIZE, CELL_SIDE, LABELS_INT_TO_STR, LABELS_STR_TO_INT
-from ..constants.colors import YELLOW, BLACK, GRAY, WHITE, BLUE, GREEN, RED, TMP_BACKGROUND
+from ..constants.configuration import ENVIRONMENT_SIZE, MAP_GRID_SIZE, CELL_SIDE, LABELS_INT_TO_STR, LABELS_STR_TO_INT, ROBOT_RADIUS
+from ..constants.colors import BLACK, BLUE_SEMITRASPARENT, BLUE_SEMITRASPARENT_DARK, GRAY, WHITE, BLUE, GREEN, RED, TMP_BACKGROUND
 
 
 class Graphics:
@@ -24,14 +24,16 @@ class Graphics:
         real_world_surface = self.screen.subsurface((50, 50, ENVIRONMENT_SIZE, ENVIRONMENT_SIZE))
         real_world_surface.fill(WHITE)
         self._draw_walls(real_world_surface)
-        self._draw_lidar(real_world_surface, rays)
         self._draw_robot(real_world_surface)
+        self._draw_lidar(real_world_surface, rays)
         # Right: internal map
         internal_map_surface = self.screen.subsurface((ENVIRONMENT_SIZE + 100, 50, ENVIRONMENT_SIZE, ENVIRONMENT_SIZE))
         internal_map_surface.fill(WHITE)
         self._draw_map(internal_map_surface)
         self._draw_robot(internal_map_surface)
-        # robot.draw_lidar(internal_map_surface, rays)
+        # self._draw_lidar(internal_map_surface, rays)
+        self._draw_vision(internal_map_surface)
+        
 
         # grid status
         for i, (val, count) in enumerate(sorted(grid_status.items())):
@@ -82,6 +84,61 @@ class Graphics:
         for hit_x, hit_y in rays:
             if hit_x is not None and hit_y is not None:
                 pygame.draw.line(surface, BLUE, (int(self.robot.x), int(self.robot.y)), (int(hit_x), int(hit_y)), 1)
+
+    def _draw_vision(self, surface):
+        # 1) Calcolo dimensioni e posizioni
+        offset = 15.5 * CELL_SIDE
+        w = h = int(offset * 2)
+        x_start = self.robot.x - offset
+        y_start = self.robot.y - offset
+
+        # Creo una surface temporanea che supporta il per-pixel alpha
+        rect_surf = pygame.Surface((w, h), pygame.SRCALPHA)
+
+        # Disegno il rettangolo pieno su rect_surf
+        pygame.draw.rect(rect_surf, BLUE_SEMITRASPARENT_DARK, rect_surf.get_rect()) 
+
+        # Blitto rect_surf sul surface principale, rispettando l’alpha
+        surface.blit(rect_surf, (x_start, y_start))
+
+        # left
+        x = 0
+        y = self.robot.y - ROBOT_RADIUS 
+        w = self.robot.x - ROBOT_RADIUS
+        h = ROBOT_RADIUS * 2
+        rect_surf = pygame.Surface((w, h), pygame.SRCALPHA)
+        pygame.draw.rect(rect_surf, BLUE_SEMITRASPARENT, rect_surf.get_rect()) 
+        surface.blit(rect_surf, (x, y))
+
+        # right
+        x = self.robot.x + ROBOT_RADIUS
+        y = self.robot.y - ROBOT_RADIUS 
+        w = ENVIRONMENT_SIZE
+        h = ROBOT_RADIUS * 2
+        rect_surf = pygame.Surface((w, h), pygame.SRCALPHA)
+        pygame.draw.rect(rect_surf, BLUE_SEMITRASPARENT, rect_surf.get_rect()) 
+        surface.blit(rect_surf, (x, y))
+
+        # up
+        x = self.robot.x - ROBOT_RADIUS
+        y = 0
+        w = ROBOT_RADIUS * 2
+        h = self.robot.y - ROBOT_RADIUS
+        rect_surf = pygame.Surface((w, h), pygame.SRCALPHA)
+        pygame.draw.rect(rect_surf, BLUE_SEMITRASPARENT, rect_surf.get_rect()) 
+        surface.blit(rect_surf, (x, y))
+
+        # down
+        x = self.robot.x - ROBOT_RADIUS
+        y = self.robot.y + ROBOT_RADIUS
+        w = ROBOT_RADIUS * 2
+        h = ENVIRONMENT_SIZE
+        rect_surf = pygame.Surface((w, h), pygame.SRCALPHA)
+        pygame.draw.rect(rect_surf, BLUE_SEMITRASPARENT, rect_surf.get_rect()) 
+        surface.blit(rect_surf, (x, y))
+
+    
+
 
     def _draw_map(self, surface):
         # draw occupancy grid to a given surface of size ENVIRONMENT_WIDTH x ENVIRONMENT_HEIGHT

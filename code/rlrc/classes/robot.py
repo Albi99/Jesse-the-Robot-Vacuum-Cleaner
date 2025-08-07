@@ -146,42 +146,55 @@ class Robot:
 
         done = False
 
+        grid_status = status[0]
         clean_key = np.int16(LABELS_STR_TO_INT['clean'])
-        if clean_key in status:
-            clean = status[clean_key]
+        if clean_key in grid_status:
+            clean = grid_status[clean_key]
         else:
             clean = 0
-        free = status[np.int16(LABELS_STR_TO_INT['free'])]
-        clean_over_free = round(clean / (clean + free) * 100, 2)
+        free = grid_status[np.int16(LABELS_STR_TO_INT['free'])]
+        clean_over_free = (clean / (clean + free))
 
-        # if come back too early (or never leave)
-        if self._percent_on_base() > 0 and clean_over_free < .8:
-            self.next_reward -= 100
+        # if step over base
+        if self._percent_on_base() > 0:
+            # if is too early
+            if clean_over_free < .8:
+                self.next_reward -= 100
+            else:
+                self.next_reward += 10
         
         # back in base (end game)
         # 3 step to leave the base
         if self._percent_on_base() > .8 and self.step > 3:
             done = True
 
-            # in don't clean enough
-            if clean_over_free < .8:
-                self.next_reward -= 100
+            # # in don't clean enough
+            # if clean_over_free < .8:
+            #     self.next_reward -= 100
 
-            # battery level
-            if self.battery < .1:
-                # if come back in base with less then 10% battery
-                self.next_reward -= 20
-            elif self.battery < .2:
-                # if come back in base with less then 20% battery
-                self.next_reward -= 10
-            else:
-                # if come back in base with 20% or more battery
-                self.next_reward += 10
+            # # battery level
+            # if self.battery < .1:
+            #     # if come back in base with less then 10% battery
+            #     self.next_reward -= 20
+            # elif self.battery < .2:
+            #     # if come back in base with less then 20% battery
+            #     self.next_reward -= 10
+            # else:
+            #     # if come back in base with 20% or more battery
+            #     self.next_reward += 10
 
-        elif self.battery < self.delta_battery_per_step:
-            # se non rientra in base
-            self.next_reward -= 100
-            done = True
+        # elif self.battery < self.delta_battery_per_step:
+        #     # se non rientra in base
+        #     self.next_reward -= 100
+        #     done = True
+
+        
+        # penality for each step
+        # self.next_reward -= 1
+        # penality for not cleaned area
+        self.next_reward -= (1 - clean_over_free) * 10
+        # penality for battery consume
+        self.next_reward -= (1 - self.battery) * 10
         
         self.next_reward /= 100
         self.total_reward += self.next_reward
@@ -210,7 +223,7 @@ class Robot:
             d_collision_point_x, d_collision_point_y = nx // CELL_SIDE, ny // CELL_SIDE
             # print(f"Collision detected at, real coordinates: ({nx:.2f}, {ny:.2f}) ")
             # print(f"                           internal map: ({dnx}, {dny}) ")
-            self.next_reward -= 5
+            self.next_reward -= 10
         else:
             d_collision_point_x, d_collision_point_y = -1, -1
             # commit e pulizia
@@ -222,10 +235,6 @@ class Robot:
         status = self.status()
 
         self.battery -= self.delta_battery_per_step
-        # penality for each step
-        self.next_reward -= 1
-        # if self.battery < 0.2:
-        #     self.next_reward -= 2
         return (d_collision_point_x, d_collision_point_y), lidar_distances, rays, status
 
     def move_random(self):
