@@ -1,4 +1,6 @@
 import pygame
+import torch
+from torch.utils.tensorboard import SummaryWriter
 
 from .classes.environment import Environment
 from .classes.robot import Robot
@@ -10,6 +12,7 @@ from .constants.maps import MAP_1, MAP_2, MAP_3, MAP_4
 
 
 def train():
+
     plot_scores = []
     plot_mean_scores = []
     total_score = 0

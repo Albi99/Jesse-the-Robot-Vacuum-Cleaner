@@ -47,8 +47,8 @@ def plot(scores, mean_scores):
     display.display(plt.gcf())
     plt.clf()
     plt.title('Training...')
-    plt.xlabel('Number of Games')
-    plt.ylabel('Score')
+    plt.xlabel('Number of episodes')
+    plt.ylabel('Return (total reward)')
     plt.plot(scores)
     plt.plot(mean_scores)
     # plt.ylim(ymin=0)
@@ -56,3 +56,10 @@ def plot(scores, mean_scores):
     plt.text(len(mean_scores)-1, mean_scores[-1], str(mean_scores[-1]))
     plt.show(block=False)
     plt.pause(.1)
+
+
+
+################################
+
+
+# ...

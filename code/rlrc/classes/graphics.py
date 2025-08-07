@@ -43,7 +43,7 @@ class Graphics:
         self.screen.blit(txt, (ENVIRONMENT_SIZE + 150, 35 + 20*len(grid_status)))
 
         # total reward
-        txt = self.font.render(f'total reward: {score}', True, BLACK)
+        txt = self.font.render(f'return (total reward): {score}', True, BLACK)
         self.screen.blit(txt, (ENVIRONMENT_SIZE + 150, 35 + 20*len(grid_status) + 20))
 
         # % clean over free
@@ -53,8 +53,8 @@ class Graphics:
         else:
             clean = 0
         free = grid_status[np.int16(LABELS_STR_TO_INT['free'])]
-        clean_over_free = round(clean / free * 100, 2)
-        txt = self.font.render(f'clean over free: {clean_over_free} %', True, BLACK)
+        clean_over_free = round(clean / (clean + free) * 100, 2)
+        txt = self.font.render(f'clean / (clean + free): {clean_over_free} %', True, BLACK)
         self.screen.blit(txt, (ENVIRONMENT_SIZE + 150, 35 + 20*len(grid_status) + 40))
 
         pygame.display.flip()       # Update all the screen

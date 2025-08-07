@@ -16,7 +16,7 @@ class Robot:
                  lidar_max_distance, 
                  environment, 
                  battery=1, 
-                 delta_battery_per_step=0.001,   # autonomia: 50 metri = 1000 steps
+                 delta_battery_per_step=0.0001,   # autonomia: 500 metri = 10'000 steps
                  base_position=None
                  ):
         # internal occupancy grid
@@ -102,10 +102,10 @@ class Robot:
         # 7) footprint della base
         self._footprint('base')
 
-    def _back_in_base(self) -> bool:
+    def _percent_on_base(self) -> bool:
         """
-        Ritorna True se almeno la metà delle celle del quadrato
-        di ingombro del robot (footprint) sono etichettate come 'base'.
+        Ritorna l apercentuale delle celle del quadrato
+        di ingombro del robot (footprint) sovrapposte con la base.
         """
         # centro in celle
         cx = int(self.x // CELL_SIDE)
@@ -126,8 +126,7 @@ class Robot:
                     if self.grid[yg, xg] == base_lbl:
                         count_base += 1
 
-        # almeno qualcosa %
-        return count_base >= total * 0.75 and self.step > 3
+        return count_base / total
 
     def reset(self, base_position=None):
         self.total_reward = 0
@@ -146,8 +145,29 @@ class Robot:
         self.grid_diff()
 
         done = False
-        if self._back_in_base():
+
+        clean_key = np.int16(LABELS_STR_TO_INT['clean'])
+        if clean_key in status:
+            clean = status[clean_key]
+        else:
+            clean = 0
+        free = status[np.int16(LABELS_STR_TO_INT['free'])]
+        clean_over_free = round(clean / (clean + free) * 100, 2)
+
+        # if come back too early (or never leave)
+        if self._percent_on_base() > 0 and clean_over_free < .8:
+            self.next_reward -= 100
+        
+        # back in base (end game)
+        # 3 step to leave the base
+        if self._percent_on_base() > .8 and self.step > 3:
             done = True
+
+            # in don't clean enough
+            if clean_over_free < .8:
+                self.next_reward -= 100
+
+            # battery level
             if self.battery < .1:
                 # if come back in base with less then 10% battery
                 self.next_reward -= 20
@@ -157,11 +177,13 @@ class Robot:
             else:
                 # if come back in base with 20% or more battery
                 self.next_reward += 10
+
         elif self.battery < self.delta_battery_per_step:
             # se non rientra in base
             self.next_reward -= 100
             done = True
         
+        self.next_reward /= 100
         self.total_reward += self.next_reward
         # TODO: maybe add score = cleanded area / total area to clean
         return self.next_reward, done, self.total_reward, d_collision_point, lidar_distances, rays, status
@@ -319,7 +341,7 @@ class Robot:
         delta_clean = curr_clean - prev_clean
         # Aggiorna snapshot precedente
         self.previus_grid = curr.copy()
-        self.next_reward += - delta_unknow
+        self.next_reward += - delta_unknow / 2
         self.next_reward += delta_clean * 2
  
     def status(self):
