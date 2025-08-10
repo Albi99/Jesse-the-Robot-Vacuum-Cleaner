@@ -5,7 +5,7 @@ import math, random
 from collections import deque
 
 from ..constants.configuration import ENVIRONMENT_SIZE, MAP_GRID_SIZE, CELL_SIDE, LABELS_INT_TO_STR, LABELS_STR_TO_INT, ACTION_TO_STRING
-from ..utils import point_in_poly, ray_segment_intersection
+from ..utils import point_in_poly, ray_segment_intersection, too_close_to_corner
 
 
 class Robot:
@@ -25,13 +25,13 @@ class Robot:
         # footprint in cells
         self.footprint_cells = int(math.ceil(self.radius / CELL_SIDE)) - 1
         self.environment = environment
+        self.epsilon = 1e-6
         # charging base and robot position
         self._set_base(base_position)
         self.speed = speed
         self.LIDAR_NUM_RAYS = lidar_num_rays
         self.LIDAR_MAX_DISTANCE = lidar_max_distance
         self.angle = random.randint(0, 3)  # random.uniform(0, 2*math.pi)
-        self.epsilon = 1e-6
 
         self.step = 0
         self.battery = battery
@@ -82,22 +82,63 @@ class Robot:
                             dist[ny][nx] = dist[y][x] + 1
                             dq.append((ny, nx))
 
+            # # 4) Troviamo tutte le celle a distanza ESATTAMENTE cells_in
+            # candidates = [
+            #     (gy, gx)
+            #     for gy in range(N)
+            #     for gx in range(N)
+            #     if interior[gy][gx] and dist[gy][gx] == cells_in
+            # ]
+            # if not candidates:
+            #     raise RuntimeError("Nessuna cella valida trovata per la base con raggio = %d celle" % cells_in)
+
+            # # 5) Scegliamo una cella a caso come centro della base
+            # gy, gx = random.choice(candidates)
+
+            # # 6) Posizioniamo il robot al centro di quella cella (in pixel)
+            # self.x = (gx + 0.5) * CELL_SIDE
+            # self.y = (gy + 0.5) * CELL_SIDE
+
             # 4) Troviamo tutte le celle a distanza ESATTAMENTE cells_in
-            candidates = [
+            ring_candidates = [
                 (gy, gx)
                 for gy in range(N)
                 for gx in range(N)
                 if interior[gy][gx] and dist[gy][gx] == cells_in
             ]
-            if not candidates:
+            if not ring_candidates:
                 raise RuntimeError("Nessuna cella valida trovata per la base con raggio = %d celle" % cells_in)
 
-            # 5) Scegliamo una cella a caso come centro della base
+            # raggio di sicurezza dagli angoli (in celle)
+            CORNER_SAFE_CELLS = self.footprint_cells + 1
+            CORNER_SAFE_PX = CORNER_SAFE_CELLS * CELL_SIDE
+            EPS = self.epsilon
+
+            # raccogli i vertici unici dei segmenti (muri)
+            verts = []
+            for (x1, y1, x2, y2) in self.environment.walls:
+                verts.append((x1, y1))
+                verts.append((x2, y2))
+            unique_verts = []
+            for vx, vy in verts:
+                if all(abs(vx-ux) > EPS or abs(vy-uy) > EPS for (ux, uy) in unique_verts):
+                    unique_verts.append((vx, vy))
+
+            candidates = [(gy, gx) for (gy, gx) in ring_candidates if not too_close_to_corner(gx, gy, unique_verts, CORNER_SAFE_PX)]
+            if not candidates:
+                raise RuntimeError(
+                    "Tutte le celle a distanza %d sono troppo vicine a un angolo. "
+                    "Aumenta l'area o riduci CORNER_SAFE_CELLS."
+                    % cells_in
+                )
+
+            # 5) Scegli una cella a caso tra le valide
             gy, gx = random.choice(candidates)
 
             # 6) Posizioniamo il robot al centro di quella cella (in pixel)
             self.x = (gx + 0.5) * CELL_SIDE
             self.y = (gy + 0.5) * CELL_SIDE
+
 
         # 7) footprint della base
         self._footprint('base')

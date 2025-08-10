@@ -5,7 +5,7 @@ from .classes.environment import Environment
 from .classes.robot import Robot
 from .classes.graphics import Graphics
 from .classes.agent import Agent
-from .utils import plot_score, plot_battery_and_area
+from .utils import plot_training
 from .constants.configuration import ROBOT_RADIUS, ROBOT_SPEED, LIDAR_NUM_RAYS, LIDAR_MAX_DISTANCE, LABELS_STR_TO_INT
 from .constants.maps import MAP_1, MAP_2, MAP_3, MAP_4
 
@@ -79,7 +79,6 @@ def train():
             total_score += score
             mean_score = total_score / agent.n_games
             plot_mean_scores.append(mean_score)
-            plot_score(plot_scores, plot_mean_scores)
 
             
             grid_status, battery = status
@@ -93,7 +92,8 @@ def train():
             clean_over_free = round(clean / (clean + free) * 100, 2)
             battery_s.append(battery*100)
             clean_over_free_s.append(clean_over_free)
-            plot_battery_and_area(battery_s, clean_over_free_s)
+
+            plot_training(plot_scores, plot_mean_scores, battery_s, clean_over_free_s)
 
 
 if __name__ == '__main__':

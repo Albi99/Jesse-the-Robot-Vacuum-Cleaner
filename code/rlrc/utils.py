@@ -20,6 +20,7 @@ def ray_segment_intersection(px, py, dx, dy, x1, y1, x2, y2):
         return t, u
     return None, None
 
+
 def point_in_poly(x, y, poly):
     """
     Ray‐casting algorithm: ritorna True se (x,y) è dentro il poligono poly = [(x1,y1),...].
@@ -34,45 +35,63 @@ def point_in_poly(x, y, poly):
     return inside
 
 
+from .constants.configuration import CELL_SIDE
+
+
+def too_close_to_corner(gx, gy, unique_verts, CORNER_SAFE_PX):
+    px = (gx + 0.5) * CELL_SIDE
+    py = (gy + 0.5) * CELL_SIDE
+    for (vx, vy) in unique_verts:
+        dx = px - vx
+        dy = py - vy
+        if dx*dx + dy*dy <= CORNER_SAFE_PX * CORNER_SAFE_PX:
+            return True
+    return False
+
+
 ################################
 
 
 import matplotlib.pyplot as plt
 from IPython import display
 
+
 plt.ion()
 
-def plot_score(scores, mean_scores):
+def plot_training(scores, mean_scores, battery_s, clean_over_free_s):
     display.clear_output(wait=True)
-    display.display(plt.gcf())
-    plt.clf()
-    plt.title('Training...')
-    plt.xlabel('Number of episodes')
-    plt.ylabel('Return (total reward)')
-    plt.plot(scores)
-    plt.plot(mean_scores)
-    # plt.ylim(ymin=0)
-    plt.text(len(scores)-1, scores[-1], str(scores[-1]))
-    plt.text(len(mean_scores)-1, mean_scores[-1], str(mean_scores[-1]))
-    plt.show(block=False)
-    plt.pause(.1)
-
-
-def plot_battery_and_area(battery_s, clean_over_free_s):
-    display.clear_output(wait=True)
-    display.display(plt.gcf())
-    plt.clf()
-    plt.title('Training...')
-    plt.xlabel('%')
-    plt.ylabel('Battery level and cleaned area')
-    plt.plot(battery_s)
-    plt.plot(clean_over_free_s)
-    plt.ylim(ymin=0, ymax=1)
-    plt.text(len(battery_s)-1, battery_s[-1], str(battery_s[-1]))
-    plt.text(len(clean_over_free_s)-1, clean_over_free_s[-1], str(clean_over_free_s[-1]))
-    plt.show(block=False)
-    plt.pause(.1)
-
+    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(8, 8))  # 2 righe, 1 colonna
+    
+    # --- Primo grafico: score ---
+    ax1.set_title('Training: Return')
+    ax1.set_xlabel('Number of episodes')
+    ax1.set_ylabel('Return (total reward)')
+    ax1.plot(scores, label='Score')
+    ax1.plot(mean_scores, label='Mean Score')
+    ax1.legend()
+    if scores:
+        ax1.text(len(scores)-1, scores[-1], f"{scores[-1]:.2f}")
+    if mean_scores:
+        ax1.text(len(mean_scores)-1, mean_scores[-1], f"{mean_scores[-1]:.2f}")
+    
+    # --- Secondo grafico: battery e area ---
+    ax2.set_title('Battery Level & Cleaned Area')
+    ax2.set_xlabel('Steps')
+    ax2.set_ylabel('%')
+    ax2.plot(battery_s, label='Battery Level')
+    ax2.plot(clean_over_free_s, label='Cleaned Area')
+    ax2.set_ylim(0, 1)
+    ax2.legend()
+    if battery_s:
+        ax2.text(len(battery_s)-1, battery_s[-1], f"{battery_s[-1]:.2f}")
+    if clean_over_free_s:
+        ax2.text(len(clean_over_free_s)-1, clean_over_free_s[-1], f"{clean_over_free_s[-1]:.2f}")
+    
+    # --- Mostra ---
+    plt.tight_layout()
+    display.display(fig)
+    plt.pause(0.1)
+    plt.close(fig)
 
 
 ################################
