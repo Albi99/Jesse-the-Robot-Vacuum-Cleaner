@@ -55,14 +55,22 @@ def too_close_to_corner(gx, gy, unique_verts, CORNER_SAFE_PX):
 import matplotlib.pyplot as plt
 from IPython import display
 
-
 plt.ion()
+
+# creo la figura e gli assi UNA SOLA VOLTA
+fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(8, 8))
+
+# Disabilita la chiusura della finestra con doppio click o X
+try:
+    fig.canvas.manager.window.protocol("WM_DELETE_WINDOW", lambda: None)
+except Exception:
+    pass  # su backend non-Tk questa parte può non servire
 
 def plot_training(scores, mean_scores, battery_s, clean_over_free_s):
     display.clear_output(wait=True)
-    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(8, 8))  # 2 righe, 1 colonna
-    
-    # --- Primo grafico: score ---
+
+    # --- Primo grafico ---
+    ax1.cla()  # clear axis
     ax1.set_title('Training: Return')
     ax1.set_xlabel('Number of episodes')
     ax1.set_ylabel('Return (total reward)')
@@ -73,25 +81,25 @@ def plot_training(scores, mean_scores, battery_s, clean_over_free_s):
         ax1.text(len(scores)-1, scores[-1], f"{scores[-1]:.2f}")
     if mean_scores:
         ax1.text(len(mean_scores)-1, mean_scores[-1], f"{mean_scores[-1]:.2f}")
-    
-    # --- Secondo grafico: battery e area ---
+
+    # --- Secondo grafico ---
+    ax2.cla()
     ax2.set_title('Battery Level & Cleaned Area')
     ax2.set_xlabel('Steps')
     ax2.set_ylabel('%')
     ax2.plot(battery_s, label='Battery Level')
     ax2.plot(clean_over_free_s, label='Cleaned Area')
-    ax2.set_ylim(0, 1)
+    ax2.set_ylim(0, 1.1)
     ax2.legend()
     if battery_s:
         ax2.text(len(battery_s)-1, battery_s[-1], f"{battery_s[-1]:.2f}")
     if clean_over_free_s:
         ax2.text(len(clean_over_free_s)-1, clean_over_free_s[-1], f"{clean_over_free_s[-1]:.2f}")
-    
+
     # --- Mostra ---
     plt.tight_layout()
     display.display(fig)
     plt.pause(0.1)
-    plt.close(fig)
 
 
 ################################
