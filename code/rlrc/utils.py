@@ -42,7 +42,7 @@ from IPython import display
 
 plt.ion()
 
-def plot(scores, mean_scores):
+def plot_score(scores, mean_scores):
     display.clear_output(wait=True)
     display.display(plt.gcf())
     plt.clf()
@@ -54,6 +54,22 @@ def plot(scores, mean_scores):
     # plt.ylim(ymin=0)
     plt.text(len(scores)-1, scores[-1], str(scores[-1]))
     plt.text(len(mean_scores)-1, mean_scores[-1], str(mean_scores[-1]))
+    plt.show(block=False)
+    plt.pause(.1)
+
+
+def plot_battery_and_area(battery_s, clean_over_free_s):
+    display.clear_output(wait=True)
+    display.display(plt.gcf())
+    plt.clf()
+    plt.title('Training...')
+    plt.xlabel('%')
+    plt.ylabel('Battery level and cleaned area')
+    plt.plot(battery_s)
+    plt.plot(clean_over_free_s)
+    plt.ylim(ymin=0, ymax=1)
+    plt.text(len(battery_s)-1, battery_s[-1], str(battery_s[-1]))
+    plt.text(len(clean_over_free_s)-1, clean_over_free_s[-1], str(clean_over_free_s[-1]))
     plt.show(block=False)
     plt.pause(.1)
 

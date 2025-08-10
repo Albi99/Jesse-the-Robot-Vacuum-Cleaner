@@ -183,18 +183,19 @@ class Robot:
             #     # if come back in base with 20% or more battery
             #     self.next_reward += 10
 
-        # elif self.battery < self.delta_battery_per_step:
-        #     # se non rientra in base
-        #     self.next_reward -= 100
-        #     done = True
+        elif self.battery < self.delta_battery_per_step:
+            # se non rientra in base
+            self.next_reward -= 100
+            done = True
 
         
         # penality for each step
         # self.next_reward -= 1
         # penality for not cleaned area
-        self.next_reward -= (1 - clean_over_free) * 10
-        # penality for battery consume
-        self.next_reward -= (1 - self.battery) * 10
+        # self.next_reward -= (1 - clean_over_free) * 10
+
+        # penality for battery consume (penality step)
+        self.next_reward -= (1 - self.battery) * 100
         
         self.next_reward /= 100
         self.total_reward += self.next_reward
@@ -303,7 +304,8 @@ class Robot:
                         gy += 1
                     else:
                         gy -= 1
-                    if self.grid[gy, gx] < LABELS_STR_TO_INT['clean']:
+                    if self.grid[gy, gx] < LABELS_STR_TO_INT['clean'] \
+                        and self.grid[gy, gx] != LABELS_STR_TO_INT['static obstacle']:
                         self.grid[gy, gx] = LABELS_STR_TO_INT['free']
             # se c'è un impatto, segna l'ostacolo
             if dist >= 0 and hit_x is not None and hit_y is not None:
@@ -330,7 +332,9 @@ class Robot:
                 if 0<=gx<MAP_GRID_SIZE and 0<=gy<MAP_GRID_SIZE:
                     if label == 'base':
                         self.grid[gy,gx] = LABELS_STR_TO_INT[label]
-                    elif label == 'clean' and self.grid[gy, gx] != LABELS_STR_TO_INT['base']:
+                    elif label == 'clean' \
+                        and self.grid[gy, gx] != LABELS_STR_TO_INT['base'] \
+                        and self.grid[gy, gx] != LABELS_STR_TO_INT['static obstacle']:
                         self.grid[gy,gx] = LABELS_STR_TO_INT[label]
     
     def grid_diff(self):
@@ -351,7 +355,7 @@ class Robot:
         # Aggiorna snapshot precedente
         self.previus_grid = curr.copy()
         self.next_reward += - delta_unknow / 2
-        self.next_reward += delta_clean * 2
+        self.next_reward += delta_clean * 10
  
     def status(self):
         unique, counts = np.unique(self.grid, return_counts=True)

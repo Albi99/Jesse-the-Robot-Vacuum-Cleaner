@@ -23,7 +23,7 @@ class Agent:
         # n = len(LABELS_INT_TO_STR)
         # cells_per_robot_side = (2 * ROBOT_RADIUS // CELL_SIDE)
         # input_size = int(4 + LIDAR_NUM_RAYS + n + 4 * cells_per_robot_side * n * 2) # 405
-        input_size = 1285 # 405 + 760 (+ 1200) = 1285
+        input_size = 1289 # 409 + 760 (+ 1200) = 1285
         output_size = 4
 
         self.model = Linear_QNet(input_size, output_size)
@@ -31,8 +31,12 @@ class Agent:
 
 
     def get_state(self, robot, d_collision_point, lidar_distances):
-        # current orientation, battery
-        state = [robot.angle, robot.battery,]
+        # base position (in the grid)
+        bx, by = robot.base_position[0]//CELL_SIDE, robot.base_position[1]//CELL_SIDE
+        state = [bx, by]
+
+        # current position (in the grid), current orientation, battery
+        state += [robot.x//CELL_SIDE, robot.y//CELL_SIDE, robot.angle, robot.battery,]
 
         # collision point, lidar distances
         state += list(d_collision_point) + lidar_distances

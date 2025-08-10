@@ -1,13 +1,12 @@
 import pygame
-import torch
-from torch.utils.tensorboard import SummaryWriter
+import numpy as np
 
 from .classes.environment import Environment
 from .classes.robot import Robot
 from .classes.graphics import Graphics
 from .classes.agent import Agent
-from .utils import plot
-from .constants.configuration import ROBOT_RADIUS, ROBOT_SPEED, LIDAR_NUM_RAYS, LIDAR_MAX_DISTANCE, LABELS_INT_TO_STR, CELL_SIDE
+from .utils import plot_score, plot_battery_and_area
+from .constants.configuration import ROBOT_RADIUS, ROBOT_SPEED, LIDAR_NUM_RAYS, LIDAR_MAX_DISTANCE, LABELS_STR_TO_INT
 from .constants.maps import MAP_1, MAP_2, MAP_3, MAP_4
 
 
@@ -15,6 +14,8 @@ def train():
 
     plot_scores = []
     plot_mean_scores = []
+    battery_s = []
+    clean_over_free_s = []
     total_score = 0
     record = 0
 
@@ -46,14 +47,14 @@ def train():
         action = agent.get_action(state_old)
 
         # perform move and get new state
-        reward, done, score, d_collision_point, lidar_distances, rays, grid_status = robot.play_step(action)
+        reward, done, score, d_collision_point, lidar_distances, rays, status = robot.play_step(action)
         state_new = agent.get_state(robot, d_collision_point, lidar_distances)
 
         old_d_collision_point = d_collision_point
         old_lidar_distances = lidar_distances.copy()
 
         # update graphics
-        graphics.update(rays, grid_status, score)
+        graphics.update(rays, status, score)
         print(f'action: {action}, reward: {robot.next_reward}')
 
         # train short memory
@@ -78,7 +79,21 @@ def train():
             total_score += score
             mean_score = total_score / agent.n_games
             plot_mean_scores.append(mean_score)
-            plot(plot_scores, plot_mean_scores)
+            plot_score(plot_scores, plot_mean_scores)
+
+            
+            grid_status, battery = status
+            # % clean over free
+            clean_key = np.int16(LABELS_STR_TO_INT['clean'])
+            if clean_key in grid_status:
+                clean = grid_status[clean_key]
+            else:
+                clean = 0
+            free = grid_status[np.int16(LABELS_STR_TO_INT['free'])]
+            clean_over_free = round(clean / (clean + free) * 100, 2)
+            battery_s.append(battery*100)
+            clean_over_free_s.append(clean_over_free)
+            plot_battery_and_area(battery_s, clean_over_free_s)
 
 
 if __name__ == '__main__':
