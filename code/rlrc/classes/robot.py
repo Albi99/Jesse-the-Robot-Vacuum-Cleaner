@@ -139,9 +139,10 @@ class Robot:
             self.x = (gx + 0.5) * CELL_SIDE
             self.y = (gy + 0.5) * CELL_SIDE
 
-
         # 7) footprint della base
         self._footprint('base')
+
+        self.base_position = (self.x, self.y)
 
     def _percent_on_base(self) -> bool:
         """
