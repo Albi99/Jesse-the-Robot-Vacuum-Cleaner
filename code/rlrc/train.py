@@ -73,8 +73,6 @@ def train():
                 record = score
                 agent.save()
 
-            print('Game', agent.n_games, 'Score', score, 'Record:', record)
-
             plot_scores.append(score)
             total_score += score
             mean_score = total_score / agent.n_games
@@ -88,6 +86,8 @@ def train():
             clean_over_free_s.append(clean_over_free)
 
             plot_training(fig, ax1, ax2, plot_scores, plot_mean_scores, battery_s, clean_over_free_s)
+
+            print(f'# episodes: {agent.n_games}, return: {score}, record (return): {record}, cleaned area: {clean_over_free}%, battery: {battery*100}')
 
 
 if __name__ == '__main__':

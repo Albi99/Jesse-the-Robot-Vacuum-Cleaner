@@ -73,7 +73,7 @@ def plot_training(fig, ax1, ax2, scores, mean_scores, battery_s, clean_over_free
 
     # --- Primo grafico ---
     ax1.cla()  # clear axis
-    ax1.set_title('Training: Return')
+    ax1.set_title('Return')
     ax1.set_xlabel('Number of episodes')
     ax1.set_ylabel('Return (total reward)')
     ax1.plot(scores, label='Score')
@@ -87,7 +87,7 @@ def plot_training(fig, ax1, ax2, scores, mean_scores, battery_s, clean_over_free
     # --- Secondo grafico ---
     ax2.cla()
     ax2.set_title('Battery Level & Cleaned Area')
-    ax2.set_xlabel('Steps')
+    ax2.set_xlabel('Number of episodes')
     ax2.set_ylabel('%')
     ax2.plot(battery_s, label='Battery Level')
     ax2.plot(clean_over_free_s, label='Cleaned Area')
