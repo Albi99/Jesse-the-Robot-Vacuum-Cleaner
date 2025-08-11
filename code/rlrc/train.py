@@ -11,16 +11,12 @@ from .constants.maps import MAP_1, MAP_2, MAP_3, MAP_4
 
 
 def train():
-
-    plot_scores = []
-    plot_mean_scores = []
-    battery_s = []
-    clean_over_free_s = []
+    plot_scores, plot_mean_scores = [], []
+    battery_s, clean_over_free_s = [], []
     total_score = 0
     record = 0
 
     environment = Environment(MAP_3)
-    # il robot parte al centro della stanza
     robot = Robot(ROBOT_RADIUS, ROBOT_SPEED, LIDAR_NUM_RAYS, LIDAR_MAX_DISTANCE, environment)
     graphics = Graphics(environment, robot)
     agent = Agent()
@@ -30,48 +26,46 @@ def train():
 
     running = True
     while running:
-        
         # human interaction
-        action = None
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
-                running = False          # chiusura con “X”
-            elif event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_ESCAPE:
-                    running = False      # chiusura con Esc
+                running = False
+            elif event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
+                running = False
 
-        # get old state
+        # stato corrente
         state_old = agent.get_state(robot, old_d_collision_point, old_lidar_distances)
 
-        # get move
-        action = agent.get_action(state_old)
+        # azione dalla policy
+        action, logprob, value, _ = agent.get_action(state_old)
 
-        # perform move and get new state
+        # step ambiente
         reward, done, score, d_collision_point, lidar_distances, rays, status = robot.play_step(action)
         state_new = agent.get_state(robot, d_collision_point, lidar_distances)
 
+        # aggiorna cache per prossimo ciclo
         old_d_collision_point = d_collision_point
         old_lidar_distances = lidar_distances.copy()
 
-        # update graphics
+        # render
         graphics.update(rays, status, score)
         print(f'action: {action}, reward: {robot.next_reward}')
 
-        # train short memory
-        agent.train_short_memory(state_old, action, reward, state_new, done)
+        # memorizza nel buffer PPO
+        agent.store_step(state_old, action, logprob, value, reward, done)
 
-        # remember
-        agent.remember(state_old, action, reward, state_new, done)
+        # aggiorna PPO se abbiamo un rollout completo o se l'episodio termina
+        if agent.step_count >= agent.rollout_steps or done:
+            agent.update(last_state_np=state_new)
 
         if done:
-            # train long memory, plot result
+            # reset episodio
             robot.reset()
             agent.n_games += 1
-            agent.train_long_memory()
 
             if score > record:
                 record = score
-                agent.model.save()
+                agent.save()
 
             print('Game', agent.n_games, 'Score', score, 'Record:', record)
 
@@ -80,17 +74,12 @@ def train():
             mean_score = total_score / agent.n_games
             plot_mean_scores.append(mean_score)
 
-            
             grid_status, battery = status
-            # % clean over free
             clean_key = np.int16(LABELS_STR_TO_INT['clean'])
-            if clean_key in grid_status:
-                clean = grid_status[clean_key]
-            else:
-                clean = 0
+            clean = grid_status.get(clean_key, 0)
             free = grid_status[np.int16(LABELS_STR_TO_INT['free'])]
             clean_over_free = round(clean / (clean + free) * 100, 2)
-            battery_s.append(battery*100)
+            battery_s.append(battery * 100)
             clean_over_free_s.append(clean_over_free)
 
             plot_training(plot_scores, plot_mean_scores, battery_s, clean_over_free_s)

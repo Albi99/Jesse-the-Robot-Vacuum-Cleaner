@@ -1,94 +1,172 @@
 import torch
-import random
+import torch.nn as nn
+import torch.optim as optim
+import torch.nn.functional as F
+from torch.distributions import Categorical
 import numpy as np
-from collections import deque
 
-from .model import Linear_QNet, QTrainer
-from ..constants.configuration import ROBOT_RADIUS, LIDAR_NUM_RAYS, LABELS_INT_TO_STR, CELL_SIDE
+from .model import PolicyValueNet
+from ..constants.configuration import CELL_SIDE, LABELS_INT_TO_STR
 
 
-MAX_MEMORY = 1_000_000
-BATCH_SIZE = 1_000
-LEARNING_RATE = 0.001
-
+DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 class Agent:
-
     def __init__(self):
+        # --- Spazio stato/azione ---
+        self.input_size = 1289
+        self.n_actions  = 4
+
+        # --- Modello + optimizer ---
+        self.model = PolicyValueNet(self.input_size, self.n_actions).to(DEVICE)
+        self.optimizer = optim.Adam(self.model.parameters(), lr=3e-4)
+
+        # --- Iperparametri PPO ---
+        self.gamma = 0.99
+        self.gae_lambda = 0.95
+        self.clip_eps = 0.20
+        self.ent_coef = 0.01
+        self.vf_coef = 0.5
+        self.max_grad_norm = 0.5
+
+        self.rollout_steps = 2048       # passi per aggiornamento (totali su più episodi)
+        self.epochs = 10                # epoche di ottimizzazione
+        self.minibatch_size = 64
+
+        # --- Buffer on-policy ---
+        self.reset_buffer()
+
+        # --- Contatori ---
         self.n_games = 0
-        self.epsilon = 0 # randomness
-        self.gamma = 0.9 # discount rate
-        self.memory = deque(maxlen=MAX_MEMORY) # popleft()
 
-        # n = len(LABELS_INT_TO_STR)
-        # cells_per_robot_side = (2 * ROBOT_RADIUS // CELL_SIDE)
-        # input_size = int(4 + LIDAR_NUM_RAYS + n + 4 * cells_per_robot_side * n * 2) # 405
-        input_size = 1289 # 409 + 760 (+ 1200) = 1285
-        output_size = 4
-
-        self.model = Linear_QNet(input_size, output_size)
-        self.trainer = QTrainer(self.model, lr=LEARNING_RATE, gamma=self.gamma)
-
-
+    # ============ Stato dal tuo robot ============
     def get_state(self, robot, d_collision_point, lidar_distances):
-        # base position (in the grid)
+        # base position (grid)
         bx, by = robot.base_position[0]//CELL_SIDE, robot.base_position[1]//CELL_SIDE
         state = [bx, by]
 
-        # current position (in the grid), current orientation, battery
-        state += [robot.x//CELL_SIDE, robot.y//CELL_SIDE, robot.angle, robot.battery,]
+        # current position (grid), angle, battery
+        state += [robot.x//CELL_SIDE, robot.y//CELL_SIDE, robot.angle, robot.battery]
 
-        # collision point, lidar distances
+        # collision point, lidar
         state += list(d_collision_point) + lidar_distances
 
         # grid status
         counter = len(LABELS_INT_TO_STR)
-        for label, count in robot.status()[0].items():
+        for _, count in robot.status()[0].items():
             state += [int(count)]
             counter -= 1
         for _ in range(counter):
             state += [0]
 
-        # (sub)grid views
+        # (sub)grid view
         state += robot._extract_submatrix_flat()
 
         # side views
         state += robot.grid_view()
 
-        return np.array(state, dtype=float)
+        return np.array(state, dtype=np.float32)
 
+    # ============ Azione dalla policy categoriale ============
+    @torch.no_grad()
+    def get_action(self, state_np: np.ndarray):
+        """
+        Ritorna: action (int), logprob (float), value (float), logits (torch)
+        """
+        state = torch.tensor(state_np, dtype=torch.float32, device=DEVICE).unsqueeze(0)  # [1, S]
+        logits, value = self.model(state)  # logits: [1, A], value: [1]
+        dist = Categorical(logits=logits)
+        action = dist.sample()             # training: campiona
+        logprob = dist.log_prob(action)    # [1]
+        return int(action.item()), float(logprob.item()), float(value.item()), logits.squeeze(0)
 
-    def remember(self, state, action, reward, next_state, done):
-        self.memory.append((state, action, reward, next_state, done)) # popleft if MAX_MEMORY is reached
+    # ============ Buffer handling ============
+    def reset_buffer(self):
+        self.states = []
+        self.actions = []
+        self.rewards = []
+        self.dones = []
+        self.logprobs = []
+        self.values = []
 
+        self.step_count = 0
 
-    def train_long_memory(self):
-        if len(self.memory) > BATCH_SIZE:
-            mini_sample = random.sample(self.memory, BATCH_SIZE) # list of tuples
-        else:
-            mini_sample = self.memory
+    def store_step(self, state_np, action, logprob, value, reward, done):
+        self.states.append(state_np)
+        self.actions.append(action)
+        self.rewards.append(reward)
+        self.dones.append(done)
+        self.logprobs.append(logprob)
+        self.values.append(value)
+        self.step_count += 1
 
-        states, actions, rewards, next_states, dones = zip(*mini_sample)
-        self.trainer.train_step(states, actions, rewards, next_states, dones)
+    # ============ Update PPO (con bootstrap sul last_state) ============
+    def update(self, last_state_np: np.ndarray):
+        if self.step_count == 0:
+            return
 
+        # Tensors
+        states = torch.tensor(np.vstack(self.states), dtype=torch.float32, device=DEVICE)     # [T, S]
+        actions = torch.tensor(self.actions, dtype=torch.long, device=DEVICE)                 # [T]
+        old_logprobs = torch.tensor(self.logprobs, dtype=torch.float32, device=DEVICE)        # [T]
+        rewards = torch.tensor(self.rewards, dtype=torch.float32, device=DEVICE)              # [T]
+        dones = torch.tensor(self.dones, dtype=torch.float32, device=DEVICE)                  # [T]
+        values = torch.tensor(self.values, dtype=torch.float32, device=DEVICE)                # [T]
 
-    def train_short_memory(self, state, action, reward, next_state, done):
-        self.trainer.train_step(state, action, reward, next_state, done)
+        # Bootstrap value from last state
+        with torch.no_grad():
+            last_state = torch.tensor(last_state_np, dtype=torch.float32, device=DEVICE).unsqueeze(0)
+            _, last_value = self.model(last_state)  # scalar
 
+        # GAE-Lambda
+        advantages = torch.zeros_like(rewards, device=DEVICE)
+        gae = 0.0
+        for t in reversed(range(self.step_count)):
+            next_value = last_value if t == self.step_count - 1 else values[t+1]
+            delta = rewards[t] + self.gamma * (1 - dones[t]) * next_value - values[t]
+            gae = delta + self.gamma * self.gae_lambda * (1 - dones[t]) * gae
+            advantages[t] = gae
+        returns = advantages + values
 
-    def get_action(self, state):
-        # random moves: tradeoff exploration / exploitation
-        # self.epsilon = 80 - self.n_games
-        self.epsilon = 240 - self.n_games
+        # Normalizza advantages
+        advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-8)
 
-        move = None
-        # if random.randint(0, 200) < self.epsilon:
-        if random.randint(0, 600) < self.epsilon:
-            # move = random.choice(['up', 'down', 'left', 'right']
-            move = random.randint(0, 3)     # right, down, left, up
-        else:
-            state0 = torch.tensor(state, dtype=torch.float)
-            prediction = self.model(state0)
-            move = torch.argmax(prediction).item()
+        # Ottimizzazione per epoche/minibatch
+        dataset_size = self.step_count
+        idxs = np.arange(dataset_size)
 
-        return move
+        for _ in range(self.epochs):
+            np.random.shuffle(idxs)
+            for start in range(0, dataset_size, self.minibatch_size):
+                mb_idx = idxs[start:start + self.minibatch_size]
+                mb_states = states[mb_idx]
+                mb_actions = actions[mb_idx]
+                mb_old_logprobs = old_logprobs[mb_idx]
+                mb_adv = advantages[mb_idx]
+                mb_returns = returns[mb_idx]
+
+                logits, new_values = self.model(mb_states)
+                dist = Categorical(logits=logits)
+                new_logprobs = dist.log_prob(mb_actions)
+                entropy = dist.entropy().mean()
+
+                ratio = torch.exp(new_logprobs - mb_old_logprobs)
+                surr1 = ratio * mb_adv
+                surr2 = torch.clamp(ratio, 1.0 - self.clip_eps, 1.0 + self.clip_eps) * mb_adv
+                policy_loss = -torch.min(surr1, surr2).mean()
+
+                value_loss = F.mse_loss(new_values, mb_returns)
+
+                loss = policy_loss + self.vf_coef * value_loss - self.ent_coef * entropy
+
+                self.optimizer.zero_grad()
+                loss.backward()
+                nn.utils.clip_grad_norm_(self.model.parameters(), self.max_grad_norm)
+                self.optimizer.step()
+
+        # Svuota buffer
+        self.reset_buffer()
+
+    # ============ Salvataggio ============
+    def save(self, file_name: str = 'model.pth'):
+        self.model.save(file_name)
