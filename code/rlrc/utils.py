@@ -1,4 +1,8 @@
 
+######## Functions for polygons ########
+
+import random
+
 def ray_segment_intersection(px, py, dx, dy, x1, y1, x2, y2):
     """
     Calcola l'intersezione tra il raggio p + t*d e il segmento (x1,y1)-(x2,y2).
@@ -37,17 +41,64 @@ def point_in_poly(x, y, poly):
 
 
 def too_close_to_corner(robot, gx, gy, unique_verts, CORNER_SAFE_PX):
-    px = (gx + 0.5) * robot.cells_per_side
-    py = (gy + 0.5) * robot.cells_per_side
+    px = (gx + 0.5) * robot.cell_side
+    py = (gy + 0.5) * robot.cell_side
     for (vx, vy) in unique_verts:
         dx = px - vx
         dy = py - vy
         if dx*dx + dy*dy <= CORNER_SAFE_PX * CORNER_SAFE_PX:
             return True
-    return False
+    return False# utils di rotazione per le mappe (0, 90, 180, 270 gradi CCW)
+import random
 
 
-################################
+def rotate_map(map_data, k: int | None = None):
+    """
+    Ruota la mappa di k * 90° in senso antiorario (CCW) attorno all'origine (0,0),
+    ricampionando le coordinate nel nuovo frame con (0,0) in alto a sinistra.
+    Se k è None, viene scelto random tra {0,1,2,3}.
+    
+    map_data: ((h, w), walls) dove walls è lista di segmenti (x1,y1,x2,y2)
+    ritorna:  ((h', w'), walls') con segmenti ruotati
+    """
+    (h, w), walls = map_data
+    if k is None:
+        k = random.choice([0, 1, 2, 3])
+    k = int(k) % 4
+
+    # dimensioni dopo la rotazione (per 90° e 270° si scambiano)
+    if k % 2 == 0:
+        h2, w2 = h, w
+    else:
+        h2, w2 = w, h
+
+    # trasformazioni per coordinate continue con origine (0,0) in alto-sx
+    # CCW: 0°, 90°, 180°, 270°
+    if k == 0:
+        def T(x, y): return (x, y)
+    elif k == 1:
+        # 90° CCW: (x', y') = (y, w - x)
+        def T(x, y): return (y, w - x)
+    elif k == 2:
+        # 180°: (x', y') = (w - x, h - y)
+        def T(x, y): return (w - x, h - y)
+    else:  # k == 3
+        # 270° CCW: (x', y') = (h - y, x)
+        def T(x, y): return (h - y, x)
+
+    walls2 = []
+    for (x1, y1, x2, y2) in walls:
+        nx1, ny1 = T(float(x1), float(y1))
+        nx2, ny2 = T(float(x2), float(y2))
+        # cast a int se vuoi mantenere coordinate intere
+        walls2.append((int(nx1), int(ny1), int(nx2), int(ny2)))
+
+    return (h2, w2), walls2
+
+
+
+
+######## Functions for plotting ########
 
 
 import matplotlib.pyplot as plt
@@ -104,14 +155,18 @@ def plot_training(fig, ax1, ax2, scores, mean_scores, battery_s, clean_over_free
     plt.pause(0.1)
 
 
-################################
+
+
+######## Functions for scaling ########
 
 
 def min_max_scaling(val, min, max):
     return (val - min) / (max- min)
 
 
-################################
+
+
+######## ... ########
 
 
 # ...

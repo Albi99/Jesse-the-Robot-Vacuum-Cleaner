@@ -45,12 +45,12 @@ class Agent:
         state = []
 
         # base position (inside grid)
-        state.append( ( robot.base_position[0] // robot.cells_per_side ) / robot.w )
-        state.append( ( robot.base_position[1] // robot.cells_per_side ) / robot.h )
+        state.append( ( robot.base_position[0] // robot.cell_side ) / robot.w )
+        state.append( ( robot.base_position[1] // robot.cell_side ) / robot.h )
 
         # current position (inside grid)
-        state.append( ( robot.x // robot.cells_per_side ) / robot.w )
-        state.append( ( robot.y // robot.cells_per_side ) / robot.h )
+        state.append( ( robot.x // robot.cell_side ) / robot.w )
+        state.append( ( robot.y // robot.cell_side ) / robot.h )
 
         # current orientation ( angle -> sin, cos )
         theta = float(robot.angle)

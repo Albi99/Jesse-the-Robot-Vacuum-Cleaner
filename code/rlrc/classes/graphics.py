@@ -86,7 +86,7 @@ class Graphics:
 
     def _draw_vision(self, surface, environment, robot):
         # 1) Calcolo dimensioni e posizioni
-        offset = 15.5 * robot.cells_per_side
+        offset = 15.5 * robot.cell_side
         w = h = int(offset * 2)
         x_start = self.robot.x - offset
         y_start = self.robot.y - offset
@@ -157,5 +157,5 @@ class Graphics:
                 else:
                     color = RED          # re-cleaned
 
-                rect = pygame.Rect(x*robot.cells_per_side, y*robot.cells_per_side, robot.cells_per_side, robot.cells_per_side)
+                rect = pygame.Rect(x*robot.cell_side, y*robot.cell_side, robot.cell_side, robot.cell_side)
                 pygame.draw.rect(surface, color, rect)

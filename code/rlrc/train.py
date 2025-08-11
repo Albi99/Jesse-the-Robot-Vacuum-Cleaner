@@ -1,13 +1,11 @@
 import pygame
 import numpy as np
 
-from .classes.environment import Environment
 from .classes.robot import Robot
 from .classes.graphics import Graphics
 from .classes.agent import Agent
 from .utils import setup_plot, plot_training
 from .constants.configuration import LABELS_STR_TO_INT
-from .constants.maps import MAP_1, MAP_2, MAP_3, MAP_4
 
 
 def train():
@@ -16,9 +14,8 @@ def train():
     total_score = 0
     record = 0
 
-    environment = Environment(MAP_3)
-    robot = Robot(environment)
-    graphics = Graphics(environment, robot)
+    robot = Robot()
+    graphics = Graphics(robot.environment, robot)
     fig, ax1, ax2 = setup_plot()
     agent = Agent()
 
@@ -49,7 +46,7 @@ def train():
         old_lidar_distances = lidar_distances.copy()
 
         # render
-        graphics.update(environment, robot, rays, (labels_count, battery), score)
+        graphics.update(robot.environment, robot, rays, (labels_count, battery), score)
         # print(f'action: {action}, reward: {robot.next_reward}')
         # print(f'min: {min(state_old)}, max: {max(state_old)}')
         # if min(state_old) < 0:
