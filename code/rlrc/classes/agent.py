@@ -6,7 +6,8 @@ from torch.distributions import Categorical
 import numpy as np
 
 from .model import PolicyValueNet
-from ..constants.configuration import CELL_SIDE, LABELS_INT_TO_STR
+from ..utils import min_max_scaling
+
 
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -14,7 +15,7 @@ DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 class Agent:
     def __init__(self):
         # --- Spazio stato/azione ---
-        self.input_size = 1289
+        self.input_size = 1291
         self.n_actions  = 4
 
         # --- Modello + optimizer ---
@@ -40,30 +41,61 @@ class Agent:
         self.n_games = 0
 
     # ============ Stato dal tuo robot ============
-    def get_state(self, robot, d_collision_point, lidar_distances):
-        # base position (grid)
-        bx, by = robot.base_position[0]//CELL_SIDE, robot.base_position[1]//CELL_SIDE
-        state = [bx, by]
+    def get_state(self, robot, collision, lidar_distances):
+        state = []
 
-        # current position (grid), angle, battery
-        state += [robot.x//CELL_SIDE, robot.y//CELL_SIDE, robot.angle, robot.battery]
+        # base position (inside grid)
+        state.append( ( robot.base_position[0] // robot.cells_per_side ) / robot.w )
+        state.append( ( robot.base_position[1] // robot.cells_per_side ) / robot.h )
 
-        # collision point, lidar
-        state += list(d_collision_point) + lidar_distances
+        # current position (inside grid)
+        state.append( ( robot.x // robot.cells_per_side ) / robot.w )
+        state.append( ( robot.y // robot.cells_per_side ) / robot.h )
 
-        # grid status
-        counter = len(LABELS_INT_TO_STR)
-        for _, count in robot.status()[0].items():
-            state += [int(count)]
-            counter -= 1
-        for _ in range(counter):
-            state += [0]
+        # current orientation ( angle -> sin, cos )
+        theta = float(robot.angle)
+        sin_th = np.sin(theta)
+        cos_th = np.cos(theta)
+        state.append( min_max_scaling(val=sin_th, min=-1, max=1) )
+        state.append( min_max_scaling(val=cos_th, min=-1, max=1) )
+
+        # current battery level
+        # (already between 0 and 1)
+        state.append( robot.battery )
+
+        # collision point
+        has_collision = collision[0]
+        dx_collision = collision[1] / robot.w
+        dy_collision = collision[2] / robot.h
+        state.append( has_collision )
+        state.append( dx_collision )
+        state.append( dy_collision )
+        
+        # LiDAR sensor
+        lidar_distances[:] = [ray / robot.lidar_max_distance for ray in lidar_distances]
+        state += lidar_distances
+
+        # labels count
+        NUM_CELLS = robot.w * robot.h
+        state += [min_max_scaling(val=count, min=0, max=NUM_CELLS) for count in list(robot.labels_count().values())]
 
         # (sub)grid view
-        state += robot._extract_submatrix_flat()
+        state += [min_max_scaling(val=cell, min=-2, max=3) for cell in robot._extract_submatrix_flat()]
 
         # side views
-        state += robot.grid_view()
+        grid_view = robot.grid_view()
+        # up and down view
+        for i in range(0, int(len(grid_view)/2), 2):
+            count = grid_view[i]
+            first_dist = grid_view[i+1]
+            state.append( min_max_scaling(val=count, min=0, max=NUM_CELLS) )
+            state.append( min_max_scaling(val=first_dist, min=0, max=robot.h) )
+        # left and right view
+        for i in range(int(len(grid_view)/2), len(grid_view), 2):
+            count = grid_view[i]
+            first_dist = grid_view[i+1]
+            state.append( min_max_scaling(val=count, min=0, max=NUM_CELLS) )
+            state.append( min_max_scaling(val=first_dist, min=0, max=robot.w) )
 
         return np.array(state, dtype=np.float32)
 

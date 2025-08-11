@@ -4,38 +4,43 @@ import random
 import math, random
 from collections import deque
 
-from ..constants.configuration import ENVIRONMENT_SIZE, MAP_GRID_SIZE, CELL_SIDE, LABELS_INT_TO_STR, LABELS_STR_TO_INT, ACTION_TO_STRING
+from ..constants.configuration import LABELS_INT_TO_STR, LABELS_STR_TO_INT, ACTION_TO_STRING
 from ..utils import point_in_poly, ray_segment_intersection, too_close_to_corner
 
 
 class Robot:
-    def __init__(self, 
-                 radius, 
-                 speed, 
-                 lidar_num_rays, 
-                 lidar_max_distance, 
+    def __init__(self,
                  environment, 
                  battery=1, 
                  delta_battery_per_step=0.0001,   # autonomia: 500 metri = 10'000 steps
                  base_position=None
                  ):
+        
         # internal occupancy grid
-        self.grid = np.full((MAP_GRID_SIZE, MAP_GRID_SIZE), 0, dtype=np.int16)
-        self.radius = radius
-        # footprint in cells
-        self.footprint_cells = int(math.ceil(self.radius / CELL_SIDE)) - 1
         self.environment = environment
-        self.epsilon = 1e-6
-        # charging base and robot position
-        self._set_base(base_position)
-        self.speed = speed
-        self.LIDAR_NUM_RAYS = lidar_num_rays
-        self.LIDAR_MAX_DISTANCE = lidar_max_distance
-        self.angle = random.randint(0, 3)  # random.uniform(0, 2*math.pi)
+        self.cells_per_side = 5
+        h = self.environment.h // self.cells_per_side
+        w = self.environment.w // self.cells_per_side
+        self.h, self.w = h, w
+        self.grid = np.full((h, w), 0, dtype=np.int16)
 
-        self.step = 0
+        # robot and LiDAR
         self.battery = battery
         self.delta_battery_per_step = delta_battery_per_step
+        self.radius = 22.5
+        self.speed = self.cells_per_side
+        self.lidar_num_rays = 36
+        self.lidar_max_distance = 400
+
+        # footprint in cells
+        self.footprint_cells = int(math.ceil(self.radius / self.cells_per_side)) - 1
+        self.epsilon = 1e-6
+
+        # charging base and robot position
+        self._set_base(base_position)
+
+        # per training
+        self.step = 0
         self.next_reward = 0
         self.total_reward = 0
         self.previus_grid = self.grid.copy()
@@ -45,28 +50,27 @@ class Robot:
             self.x = base_position[0]
             self.y = base_position[1]
         else:
-            N = MAP_GRID_SIZE
             # offset interno rispetto al muro
-            cells_in = math.ceil(self.radius / CELL_SIDE) + 1
+            cells_in = math.ceil(self.radius / self.cells_per_side) + 1
 
             # 1) Raccogliamo il poligono ordinato dei muri
             poly = self.environment.walls
 
             # 2) Creiamo la mask booleana delle celle interne
-            interior = [[False]*N for _ in range(N)]
-            for gy in range(N):
-                for gx in range(N):
-                    px = (gx + 0.5) * CELL_SIDE
-                    py = (gy + 0.5) * CELL_SIDE
+            interior = [[False]*self.w for _ in range(self.h)]
+            for gy in range(self.h):
+                for gx in range(self.w):
+                    px = (gx + 0.5) * self.cells_per_side
+                    py = (gy + 0.5) * self.cells_per_side
                     if point_in_poly(px, py, poly):
                         interior[gy][gx] = True
 
             # 3) BFS multi‐sorgente per calcolare la distanza (in celle) di ogni cella interna dal bordo
-            dist = [[math.inf]*N for _ in range(N)]
+            dist = [[math.inf]*self.w for _ in range(self.h)]
             dq = deque()
             # mettiamo in coda tutte le celle “esterne” a dist=0
-            for gy in range(N):
-                for gx in range(N):
+            for gy in range(self.h):
+                for gx in range(self.w):
                     if not interior[gy][gx]:
                         dist[gy][gx] = 0
                         dq.append((gy, gx))
@@ -76,34 +80,17 @@ class Robot:
                 y, x = dq.popleft()
                 for dy, dx in dirs:
                     ny, nx = y+dy, x+dx
-                    if 0 <= ny < N and 0 <= nx < N and dist[ny][nx] == math.inf:
+                    if 0 <= ny < self.h and 0 <= nx < self.w and dist[ny][nx] == math.inf:
                         # possiamo attraversare solo celle interne
                         if interior[ny][nx]:
                             dist[ny][nx] = dist[y][x] + 1
                             dq.append((ny, nx))
 
-            # # 4) Troviamo tutte le celle a distanza ESATTAMENTE cells_in
-            # candidates = [
-            #     (gy, gx)
-            #     for gy in range(N)
-            #     for gx in range(N)
-            #     if interior[gy][gx] and dist[gy][gx] == cells_in
-            # ]
-            # if not candidates:
-            #     raise RuntimeError("Nessuna cella valida trovata per la base con raggio = %d celle" % cells_in)
-
-            # # 5) Scegliamo una cella a caso come centro della base
-            # gy, gx = random.choice(candidates)
-
-            # # 6) Posizioniamo il robot al centro di quella cella (in pixel)
-            # self.x = (gx + 0.5) * CELL_SIDE
-            # self.y = (gy + 0.5) * CELL_SIDE
-
             # 4) Troviamo tutte le celle a distanza ESATTAMENTE cells_in
             ring_candidates = [
                 (gy, gx)
-                for gy in range(N)
-                for gx in range(N)
+                for gy in range(self.h)
+                for gx in range(self.w)
                 if interior[gy][gx] and dist[gy][gx] == cells_in
             ]
             if not ring_candidates:
@@ -111,7 +98,7 @@ class Robot:
 
             # raggio di sicurezza dagli angoli (in celle)
             CORNER_SAFE_CELLS = self.footprint_cells + 1
-            CORNER_SAFE_PX = CORNER_SAFE_CELLS * CELL_SIDE
+            CORNER_SAFE_PX = CORNER_SAFE_CELLS * self.cells_per_side
             EPS = self.epsilon
 
             # raccogli i vertici unici dei segmenti (muri)
@@ -124,7 +111,7 @@ class Robot:
                 if all(abs(vx-ux) > EPS or abs(vy-uy) > EPS for (ux, uy) in unique_verts):
                     unique_verts.append((vx, vy))
 
-            candidates = [(gy, gx) for (gy, gx) in ring_candidates if not too_close_to_corner(gx, gy, unique_verts, CORNER_SAFE_PX)]
+            candidates = [(gy, gx) for (gy, gx) in ring_candidates if not too_close_to_corner(self, gx, gy, unique_verts, CORNER_SAFE_PX)]
             if not candidates:
                 raise RuntimeError(
                     "Tutte le celle a distanza %d sono troppo vicine a un angolo. "
@@ -136,8 +123,35 @@ class Robot:
             gy, gx = random.choice(candidates)
 
             # 6) Posizioniamo il robot al centro di quella cella (in pixel)
-            self.x = (gx + 0.5) * CELL_SIDE
-            self.y = (gy + 0.5) * CELL_SIDE
+            self.x = (gx + 0.5) * self.cells_per_side
+            self.y = (gy + 0.5) * self.cells_per_side
+            
+            # --- Imposta l'angolo per puntare verso l'interno ---
+            # Mappatura direzioni (dx, dy) -> (id, angolo in radianti)
+            dir_map = {
+                (1, 0):  (0, 0.0),            # destra
+                (0, 1):  (1, 0.5*math.pi),    # giù
+                (-1, 0): (2, math.pi),        # sinistra
+                (0, -1): (3, 1.5*math.pi)     # su
+            }
+
+            best_dir = None
+            best_dist = -1
+
+            for (dx, dy), (id_val, ang_val) in dir_map.items():
+                nx, ny = gx + dx, gy + dy
+                if 0 <= nx < self.w and 0 <= ny < self.h and interior[ny][nx]:
+                    # distanza dal muro nella nuova cella
+                    if dist[ny][nx] > best_dist:
+                        best_dist = dist[ny][nx]
+                        best_dir = (id_val, ang_val)
+
+            # Se trovata direzione valida, aggiorna self.angle_id e self.angle
+            if best_dir is not None:
+                self.angle_half_pi, self.angle = best_dir
+            else:
+                # fallback se qualcosa va storto
+                self.angle_half_pi, self.angle = 0, 0.0
 
         # 7) footprint della base
         self._footprint('base')
@@ -150,8 +164,8 @@ class Robot:
         di ingombro del robot (footprint) sovrapposte con la base.
         """
         # centro in celle
-        cx = int(self.x // CELL_SIDE)
-        cy = int(self.y // CELL_SIDE)
+        cx = int(self.x // self.cells_per_side)
+        cy = int(self.y // self.cells_per_side)
         # raggio in celle come da footprint
         n = self.footprint_cells
         # etichetta della base
@@ -164,7 +178,7 @@ class Robot:
             for dx in range(-n, n+1):
                 xg = cx + dx
                 yg = cy + dy
-                if 0 <= xg < MAP_GRID_SIZE and 0 <= yg < MAP_GRID_SIZE:
+                if 0 <= xg < self.w and 0 <= yg < self.h:
                     if self.grid[yg, xg] == base_lbl:
                         count_base += 1
 
@@ -183,18 +197,17 @@ class Robot:
         self.step += 1
         if not isinstance(action, str):
             action = ACTION_TO_STRING[action]
-        d_collision_point, lidar_distances, rays, status = self.move(action)
+        collision, lidar_distances, rays, labels_count = self.move(action)
         self.grid_diff()
 
         done = False
 
-        grid_status = status[0]
         clean_key = np.int16(LABELS_STR_TO_INT['clean'])
-        if clean_key in grid_status:
-            clean = grid_status[clean_key]
+        if clean_key in labels_count:
+            clean = labels_count[clean_key]
         else:
             clean = 0
-        free = grid_status[np.int16(LABELS_STR_TO_INT['free'])]
+        free = labels_count[np.int16(LABELS_STR_TO_INT['free'])]
         clean_over_free = (clean / (clean + free))
 
         # if step over base
@@ -209,32 +222,10 @@ class Robot:
         # 3 step to leave the base
         if self._percent_on_base() > .8 and self.step > 3:
             done = True
-
-            # # in don't clean enough
-            # if clean_over_free < .8:
-            #     self.next_reward -= 100
-
-            # # battery level
-            # if self.battery < .1:
-            #     # if come back in base with less then 10% battery
-            #     self.next_reward -= 20
-            # elif self.battery < .2:
-            #     # if come back in base with less then 20% battery
-            #     self.next_reward -= 10
-            # else:
-            #     # if come back in base with 20% or more battery
-            #     self.next_reward += 10
-
         elif self.battery < self.delta_battery_per_step:
             # se non rientra in base
             self.next_reward -= 100
             done = True
-
-        
-        # penality for each step
-        # self.next_reward -= 1
-        # penality for not cleaned area
-        # self.next_reward -= (1 - clean_over_free) * 10
 
         # penality for battery consume (penality step)
         self.next_reward -= (1 - self.battery) * 100
@@ -242,7 +233,7 @@ class Robot:
         self.next_reward /= 100
         self.total_reward += self.next_reward
         # TODO: maybe add score = cleanded area / total area to clean
-        return self.next_reward, done, self.total_reward, d_collision_point, lidar_distances, rays, status
+        return self.next_reward, done, self.total_reward, collision, lidar_distances, rays, labels_count, self.battery
 
     def move(self, direction):
 
@@ -263,28 +254,30 @@ class Robot:
         # limiti mondo reale (pixel) da 0 a ENVIRONMENT_SIZE
         # (simulazioe dei sensori di contatto)
         if self._out_of_environment(nx, ny) or self._check_collision(nx, ny):
-            d_collision_point_x, d_collision_point_y = nx // CELL_SIDE, ny // CELL_SIDE
+            has_collision = 1   # True
+            d_collision_point_x, d_collision_point_y = nx // self.cells_per_side, ny // self.cells_per_side
             # print(f"Collision detected at, real coordinates: ({nx:.2f}, {ny:.2f}) ")
             # print(f"                           internal map: ({dnx}, {dny}) ")
             self.next_reward -= 10
         else:
-            d_collision_point_x, d_collision_point_y = -1, -1
+            has_collision = 0   # False
+            d_collision_point_x, d_collision_point_y = 0, 0
             # commit e pulizia
             self.x, self.y = nx, ny
             # etichetta le celle pultie
             self._footprint('clean')
         
         lidar_distances, rays = self._sense_lidar()
-        status = self.status()
+        labels_count = self.labels_count()
 
         self.battery -= self.delta_battery_per_step
-        return (d_collision_point_x, d_collision_point_y), lidar_distances, rays, status
+        return (has_collision, d_collision_point_x, d_collision_point_y), lidar_distances, rays, labels_count
 
     def move_random(self):
         self.move(random.uniform(-0.3, 0.3))
 
     def _out_of_environment(self, nx, ny):
-        return nx - self.radius < 0 or nx + self.radius > ENVIRONMENT_SIZE or ny - self.radius < 0 or ny + self.radius > ENVIRONMENT_SIZE
+        return nx - self.radius < 0 or nx + self.radius > self.environment.w or ny - self.radius < 0 or ny + self.radius > self.environment.h
 
     def _check_collision(self, cx, cy):
         for x1, y1, x2, y2 in self.environment.walls:
@@ -314,7 +307,7 @@ class Robot:
         # Scorri ogni segmento (muro) dell'ambiente
         for seg in self.environment.walls:
             t,u = ray_segment_intersection(self.x, self.y, dx, dy, *seg)
-            if t is not None and t<= self.LIDAR_MAX_DISTANCE and (nearest is None or t<nearest):
+            if t is not None and t<= self.lidar_max_distance and (nearest is None or t<nearest):
                 nearest = t
         if nearest is not None:
             return nearest, self.x+dx*nearest, self.y+dy*nearest
@@ -323,21 +316,21 @@ class Robot:
     def _sense_lidar(self):
         lidar_distances = []
         rays = []
-        step_size = CELL_SIDE / 10
-        for i in range(self.LIDAR_NUM_RAYS):
-            ray_angle = self.angle + (i / self.LIDAR_NUM_RAYS) * 2 * math.pi
+        step_size = self.cells_per_side / 10
+        for i in range(self.lidar_num_rays):
+            ray_angle = self.angle + (i / self.lidar_num_rays) * 2 * math.pi
             dx, dy = math.cos(ray_angle), math.sin(ray_angle)
             dist, hit_x, hit_y = self._cast_ray(ray_angle)
             # determino la distanza massima da marcare
-            max_range = dist if dist >= 0 else self.LIDAR_MAX_DISTANCE
+            max_range = dist if dist >= 0 else self.lidar_max_distance
             # campiono lungo la direzione per segnare liberi
             steps = int(math.ceil(max_range / step_size))
             for s in range(1, steps + 1):
                 px = self.x + dx * min(s * step_size, max_range)
                 py = self.y + dy * min(s * step_size, max_range)
-                gx = int((px + self.epsilon) // CELL_SIDE)
-                gy = int((py + self.epsilon) // CELL_SIDE)
-                if 0 <= gx < MAP_GRID_SIZE and 0 <= gy < MAP_GRID_SIZE:
+                gx = int((px + self.epsilon) // self.cells_per_side)
+                gy = int((py + self.epsilon) // self.cells_per_side)
+                if 0 <= gx < self.w and 0 <= gy < self.h:
                     if dx < 0:
                         gx += 1
                     else:
@@ -352,26 +345,27 @@ class Robot:
             # se c'è un impatto, segna l'ostacolo
             if dist >= 0 and hit_x is not None and hit_y is not None:
                 lidar_distances.append(dist)
-                gx = int((hit_x + self.epsilon) // CELL_SIDE)
-                gy = int((hit_y + self.epsilon) // CELL_SIDE)
-                if 0 <= gx < MAP_GRID_SIZE and 0 <= gy < MAP_GRID_SIZE:
+                gx = int((hit_x + self.epsilon) // self.cells_per_side)
+                gy = int((hit_y + self.epsilon) // self.cells_per_side)
+                if 0 <= gx < self.w and 0 <= gy < self.h:
                     self.grid[gy, gx] = LABELS_STR_TO_INT['static obstacle']
             else:
-                lidar_distances.append(-1)
+                # se non c'è impatto segno self.lidar_max_distance
+                lidar_distances.append(self.lidar_max_distance)
                 # questo mi serve per disegnare anche i raggi del LiDAR che non colpiscono niente
-                hit_x = self.x + math.cos(ray_angle) * self.LIDAR_MAX_DISTANCE
-                hit_y = self.y + math.sin(ray_angle) * self.LIDAR_MAX_DISTANCE
+                hit_x = self.x + math.cos(ray_angle) * self.lidar_max_distance
+                hit_y = self.y + math.sin(ray_angle) * self.lidar_max_distance
             rays.append((hit_x, hit_y))
         return lidar_distances, rays
 
     def _footprint(self, label):
         # robot position inside the internal map
-        robot_center_gx = int(self.x//CELL_SIDE);
-        robot_center_gy = int(self.y//CELL_SIDE)
+        robot_center_gx = int(self.x//self.cells_per_side);
+        robot_center_gy = int(self.y//self.cells_per_side)
         for dx in range(-self.footprint_cells, self.footprint_cells+1):
             for dy in range(-self.footprint_cells, self.footprint_cells+1):
                 gx, gy = robot_center_gx+dx, robot_center_gy+dy
-                if 0<=gx<MAP_GRID_SIZE and 0<=gy<MAP_GRID_SIZE:
+                if 0<=gx<self.w and 0<=gy<self.h:
                     if label == 'base':
                         self.grid[gy,gx] = LABELS_STR_TO_INT[label]
                     elif label == 'clean' \
@@ -399,19 +393,23 @@ class Robot:
         self.next_reward += - delta_unknow / 2
         self.next_reward += delta_clean * 10
  
-    def status(self):
+    def labels_count(self):
         unique, counts = np.unique(self.grid, return_counts=True)
-        return dict(zip(unique, counts)), self.battery
+        lc = {int(k): int(v) for k, v in zip(unique, counts)}
+        for label_int in LABELS_INT_TO_STR.keys():
+            if label_int not in lc:
+                lc[label_int] = 0
+        return lc
     
     def grid_view(self):
         # Parametri di griglia e label
         labels = LABELS_INT_TO_STR.keys()
 
         # Calcola bounding square in celle
-        radius_cells = self.radius / CELL_SIDE
+        radius_cells = self.radius / self.cells_per_side
         side = math.ceil(radius_cells * 2)
-        cx = int(self.x // CELL_SIDE)
-        cy = int(self.y // CELL_SIDE)
+        cx = int(self.x // self.cells_per_side)
+        cy = int(self.y // self.cells_per_side)
         x0 = cx - side // 2
         y0 = cy - side // 2
 
@@ -433,7 +431,7 @@ class Robot:
             # Scorri dalla cella adiacente fino al bordo
             dist = 0
             x, y = sx, sy
-            while 0 <= x < MAP_GRID_SIZE and 0 <= y < MAP_GRID_SIZE:
+            while 0 <= x < self.w and 0 <= y < self.h:
                 lbl = self.grid[y, x]
                 # Aggiorna count
                 if lbl in counts:
@@ -453,7 +451,7 @@ class Robot:
                 if d is None:
                     d = dist  # se label non trovata, distanza al bordo
                 if count == 0:
-                    d = -1
+                    d = 0
                 ray_list.append((count, d))
             result.append(ray_list)
 
@@ -471,17 +469,18 @@ class Robot:
         """
 
         # Calcola centro in coordinate di cella
-        cx = int(self.x // CELL_SIDE)
-        cy = int(self.y // CELL_SIDE)
+        cx = int(self.x // self.cells_per_side)
+        cy = int(self.y // self.cells_per_side)
 
         # Raggio in celle (arrotondato per eccesso)
-        cell_radius = int(math.ceil(self.radius / CELL_SIDE))
+        cell_radius = int(math.ceil(self.radius / self.cells_per_side))
         # Estensione desiderata: raggio + 10 celle (50 centimetri)
         half_ext = cell_radius + offset
         size = 2 * half_ext + 1
 
         # Inizializza sottomatrice con valore di padding
-        subm = np.full((size, size), -999, dtype=self.grid.dtype)
+        # -2 means "out of map"
+        subm = np.full((size, size), -2, dtype=self.grid.dtype)
 
         # Indici di partenza sulla grid originale
         x0 = cx - half_ext

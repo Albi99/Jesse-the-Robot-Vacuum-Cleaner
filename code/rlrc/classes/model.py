@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from datetime import datetime
 import os
 
 
@@ -45,8 +46,13 @@ class PolicyValueNet(nn.Module):
         value  = self.value_head(h).squeeze(-1)  # [B]
         return logits, value
 
-    def save(self, file_name: str = 'model.pth'):
+    def save(self, file_name: str = None):
         model_folder = './model'
         os.makedirs(model_folder, exist_ok=True)
+
+        if file_name is None:
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            file_name = f"model_{timestamp}_{self.n_games}.pth"
+
         path = os.path.join(model_folder, file_name)
         torch.save(self.state_dict(), path)

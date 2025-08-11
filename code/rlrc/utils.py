@@ -1,3 +1,4 @@
+
 def ray_segment_intersection(px, py, dx, dy, x1, y1, x2, y2):
     """
     Calcola l'intersezione tra il raggio p + t*d e il segmento (x1,y1)-(x2,y2).
@@ -35,12 +36,9 @@ def point_in_poly(x, y, poly):
     return inside
 
 
-from .constants.configuration import CELL_SIDE
-
-
-def too_close_to_corner(gx, gy, unique_verts, CORNER_SAFE_PX):
-    px = (gx + 0.5) * CELL_SIDE
-    py = (gy + 0.5) * CELL_SIDE
+def too_close_to_corner(robot, gx, gy, unique_verts, CORNER_SAFE_PX):
+    px = (gx + 0.5) * robot.cells_per_side
+    py = (gy + 0.5) * robot.cells_per_side
     for (vx, vy) in unique_verts:
         dx = px - vx
         dy = py - vy
@@ -55,18 +53,22 @@ def too_close_to_corner(gx, gy, unique_verts, CORNER_SAFE_PX):
 import matplotlib.pyplot as plt
 from IPython import display
 
-plt.ion()
 
-# creo la figura e gli assi UNA SOLA VOLTA
-fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(8, 8))
+def setup_plot():
+    plt.ion()
 
-# Disabilita la chiusura della finestra con doppio click o X
-try:
-    fig.canvas.manager.window.protocol("WM_DELETE_WINDOW", lambda: None)
-except Exception:
-    pass  # su backend non-Tk questa parte può non servire
+    # creo la figura e gli assi UNA SOLA VOLTA
+    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(8, 8))
 
-def plot_training(scores, mean_scores, battery_s, clean_over_free_s):
+    # Disabilita la chiusura della finestra con doppio click o X
+    try:
+        fig.canvas.manager.window.protocol("WM_DELETE_WINDOW", lambda: None)
+    except Exception:
+        pass  # su backend non-Tk questa parte può non servire
+
+    return fig, ax1, ax2
+
+def plot_training(fig, ax1, ax2, scores, mean_scores, battery_s, clean_over_free_s):
     display.clear_output(wait=True)
 
     # --- Primo grafico ---
@@ -89,7 +91,7 @@ def plot_training(scores, mean_scores, battery_s, clean_over_free_s):
     ax2.set_ylabel('%')
     ax2.plot(battery_s, label='Battery Level')
     ax2.plot(clean_over_free_s, label='Cleaned Area')
-    ax2.set_ylim(0, 1.1)
+    ax2.set_ylim(0, 110)
     ax2.legend()
     if battery_s:
         ax2.text(len(battery_s)-1, battery_s[-1], f"{battery_s[-1]:.2f}")
@@ -100,6 +102,13 @@ def plot_training(scores, mean_scores, battery_s, clean_over_free_s):
     plt.tight_layout()
     display.display(fig)
     plt.pause(0.1)
+
+
+################################
+
+
+def min_max_scaling(val, min, max):
+    return (val - min) / (max- min)
 
 
 ################################
