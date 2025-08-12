@@ -1,3 +1,4 @@
+import pygame
 import numpy as np
 from collections import deque
 
@@ -95,6 +96,11 @@ def train():
 
     while training:
 
+        # to move the window around the desktop
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                training = False          # chiusura con “X”
+
         # stato corrente
         state_old = agent.get_state(robot, old_collision, old_lidar_distances)
 
@@ -166,6 +172,11 @@ def test():
     old_lidar_distances, _ = robot._sense_lidar()
 
     for test_index in range(W):
+
+        # to move the window around the desktop
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pass
 
          # stato corrente
         state_old = agent.get_state(robot, old_collision, old_lidar_distances)
