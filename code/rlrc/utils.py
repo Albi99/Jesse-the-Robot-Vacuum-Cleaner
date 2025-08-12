@@ -63,7 +63,7 @@ def setup_plot():
     plt.ion()
 
     # creo la figura e gli assi UNA SOLA VOLTA
-    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(8, 8))
+    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(6, 6))
 
     # Disabilita la chiusura della finestra con doppio click o X
     try:
