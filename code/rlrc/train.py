@@ -148,7 +148,7 @@ def train():
             clean_over_free_s.append(clean_over_free)
 
             plot_training(fig, ax1, ax2, plot_scores, plot_mean_scores, battery_s, clean_over_free_s)
-            print(f'# episodes: {agent.n_games}, return: {score}, record (return): {record}, cleaned area: {clean_over_free}%, battery: {round(battery, 2)}, collisions: {robot.collisions}')
+            print(f'# episodes: {agent.n_games}, return: {round(score, 2)}, record (return): {round(record, 2)}, cleaned area: {clean_over_free}%, battery: {round(battery, 2)}, collisions: {robot.collisions}')
 
             success = clean_over_free >= 80 and battery >= 20 and robot.collisions == 0
 
@@ -207,7 +207,7 @@ def test():
             battery *= 100
 
             plot_training(fig, ax1, ax2, plot_scores, plot_mean_scores, battery_s, clean_over_free_s)
-            print(f'# test: {test_index}, return: {score}, record (return): {record}, cleaned area: {clean_over_free}%, battery: {round(battery, 2)}, collisions: {robot.collisions}')
+            print(f'# test: {test_index}, return: {round(score, 2)}, record (return): {round(record, 2)}, cleaned area: {clean_over_free}%, battery: {round(battery, 2)}, collisions: {robot.collisions}')
 
             success = clean_over_free >= 80 and battery >= 20 and robot.collisions == 0
 
