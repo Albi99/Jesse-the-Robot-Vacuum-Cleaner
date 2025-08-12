@@ -200,5 +200,5 @@ class Agent:
         self.reset_buffer()
 
     # ============ Salvataggio ============
-    def save(self, file_name: str = 'model.pth'):
-        self.model.save(file_name)
+    def save(self, file_name: str = 'model.pth', level=None):
+        self.model.save(file_name, level)

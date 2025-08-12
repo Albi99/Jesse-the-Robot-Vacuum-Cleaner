@@ -2,7 +2,6 @@ import pygame
 
 from .classes.robot import Robot
 from .classes.graphics import Graphics
-from .constants.maps import MAP_1, MAP_2, MAP_3, MAP_4
 
 
 def main():

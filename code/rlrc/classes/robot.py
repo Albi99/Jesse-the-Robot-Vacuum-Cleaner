@@ -3,15 +3,12 @@ import math, random
 from collections import deque
 
 from ..classes.environment import Environment
-from ..constants.maps import MAP_1, MAP_3
 from ..utils import point_in_poly, ray_segment_intersection, too_close_to_corner
 from ..constants.configuration import LABELS_INT_TO_STR, LABELS_STR_TO_INT, ACTION_TO_STRING
 
 
-MAPS = [MAP_1, MAP_3]
-
 class Robot:
-    def __init__(self):
+    def __init__(self, maps, rotation=None):
 
         # robot
         self.battery = 1    # 100%
@@ -25,7 +22,7 @@ class Robot:
         self.epsilon = 1e-6
         
         # environment, internal map, training parameters
-        self.reset()
+        self.reset(maps)
 
         # LiDAR
         self.lidar_num_rays = 36
@@ -171,11 +168,11 @@ class Robot:
 
         return count_base / total
 
-    def reset(self):
+    def reset(self, maps, rotation=None):
 
         # set random map (environment)
         # self.environment = Environment( rotate_map( random.choice(MAPS) ) )
-        self.environment = Environment( random.choice(MAPS) )
+        self.environment = Environment( random.choice(maps), k=rotation )
 
         # internal map
         h = self.environment.h // self.cell_side
