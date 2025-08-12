@@ -132,6 +132,8 @@ def train():
                 record = score
                 agent.save(level=level)
 
+            agent.n_games += 1
+
             plot_scores.append(score)
             total_score += score
             mean_score = total_score / agent.n_games
@@ -154,7 +156,6 @@ def train():
             maps = sample_maps(MAPS_TRAIN)
             robot.reset(maps)
             graphics.reset(robot)
-            agent.n_games += 1
 
             history.append(success)
             switch_to_test()
