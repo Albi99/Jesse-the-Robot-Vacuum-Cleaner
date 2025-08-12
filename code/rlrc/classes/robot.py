@@ -191,6 +191,7 @@ class Robot:
         self.next_reward = 0
         self.total_reward = 0
         self.step = 0
+        self.collisions = 0
         self.battery = 1
 
     def play_step(self, action):
@@ -255,6 +256,7 @@ class Robot:
         # limiti mondo reale (pixel) da 0 a ENVIRONMENT_SIZE
         # (simulazioe dei sensori di contatto)
         if self._out_of_environment(nx, ny) or self._check_collision(nx, ny):
+            self.collisions += 1
             has_collision = 1   # True
             d_collision_point_x, d_collision_point_y = nx // self.cell_side, ny // self.cell_side
             self.next_reward -= 10
