@@ -31,10 +31,10 @@ W = 100
 history = deque(maxlen=W)
 BIAS_LAST = 0.6
 
-global robot
-global graphics
+# global robot
+# global graphics
 global fig, ax1, ax2
-global agent
+# global agent
 global training
 robot = Robot(MAPS_TEST[level])
 graphics = Graphics(robot)
@@ -44,6 +44,8 @@ training = True
 
 
 def sample_maps(maps):
+    global level, BIAS_LAST
+
     all_maps = maps[:level]
     if level > 1 and np.random.rand() < BIAS_LAST:
         return all_maps[-1]
@@ -53,12 +55,16 @@ def sample_maps(maps):
 
 
 def switch_to_test():
-    if len(history) > W:
+    global history, W
+
+    if not len(history) < W:
         if np.mean(history) >= 0.80:
             test()
 
 
 def next_level():
+    global history, level, max_level, training
+
     if np.mean(history) >= 0.80:
         if level < max_level:
             filename = f'policy_level_{level}'
@@ -71,6 +77,18 @@ def next_level():
 
 
 def train():
+    
+    global plot_scores, plot_mean_scores
+    global battery_s, clean_over_free_s
+    global total_score, record
+    global level, history
+    global fig, ax1, ax2
+    global training
+            
+    # reset episodio
+    maps = sample_maps(MAPS_TRAIN)
+    robot.reset(maps)
+    graphics.reset(robot)
 
     old_collision = (0, 0, 0) # No collision
     old_lidar_distances, _ = robot._sense_lidar()
@@ -105,7 +123,6 @@ def train():
         if done:
             # reset episodio
             maps = sample_maps(MAPS_TRAIN)
-            print(f'maps: {maps}')
             robot.reset(maps)
             graphics.reset(robot)
             agent.n_games += 1
@@ -136,6 +153,18 @@ def train():
 
 
 def test():
+
+    global total_score, record
+    global W
+
+    # reset episodio
+    maps = sample_maps(MAPS_TEST)
+    robot.reset(maps)
+    graphics.reset(robot)
+
+    old_collision = (0, 0, 0)
+    old_lidar_distances, _ = robot._sense_lidar()
+
     for test_index in range(W):
 
          # stato corrente
