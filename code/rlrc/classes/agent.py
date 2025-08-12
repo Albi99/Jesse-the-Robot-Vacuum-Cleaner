@@ -37,7 +37,7 @@ class Agent:
         # --- Buffer on-policy ---
         self.reset_buffer()
 
-        # --- Contatori ---
+        # --- Contatore episiodi ---
         self.n_games = 0
 
     # ============ Stato dal tuo robot ============
@@ -201,4 +201,4 @@ class Agent:
 
     # ============ Salvataggio ============
     def save(self, file_name: str = 'model.pth', level=None):
-        self.model.save(file_name, level)
+        self.model.save(self.n_games, file_name, level)

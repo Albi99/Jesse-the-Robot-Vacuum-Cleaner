@@ -46,15 +46,15 @@ class PolicyValueNet(nn.Module):
         value  = self.value_head(h).squeeze(-1)  # [B]
         return logits, value
 
-    def save(self, file_name: str = None, level=None):
+    def save(self, n_games, file_name: str = None, level=None):
         model_folder = './model'
         os.makedirs(model_folder, exist_ok=True)
 
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         if level is not None:
-            file_name = f"level{level}_{timestamp}_{self.n_games}.pth"
+            file_name = f"level{level}_{timestamp}_{n_games}.pth"
         elif file_name is None:
-            file_name = f"model_{timestamp}_{self.n_games}.pth"
+            file_name = f"model_{timestamp}_{n_games}.pth"
         else:
             file_name += f'_{timestamp}'
 
