@@ -1,6 +1,5 @@
 import pygame
 
-from .classes.environment import Environment
 from .classes.robot import Robot
 from .classes.graphics import Graphics
 from .constants.maps import MAP_1, MAP_2, MAP_3, MAP_4
@@ -8,10 +7,8 @@ from .constants.maps import MAP_1, MAP_2, MAP_3, MAP_4
 
 def main():
 
-    environment = Environment(MAP_3)
-    # il robot parte al centro della stanza
-    robot = Robot(environment)
-    graphics = Graphics(environment, robot)
+    robot = Robot()
+    graphics = Graphics(robot)
 
     running = True
     while running:
@@ -33,23 +30,13 @@ def main():
                     action = 'left'
                 elif event.key == pygame.K_RIGHT:
                     action = 'right'
+                
+                elif event.key == pygame.K_r:
+                    robot.reset()
+                    graphics.reset(robot)
 
         if action is not None:
-            # rays, status = robot.move(action)
-            reward, done, score, d_collision_point, lidar_distances, rays, grid_status = robot.play_step(action)
-            graphics.update(rays, grid_status, score)
-            # print(robot._extract_submatrix_flat())
-            print(f'action: {action}, reward: {robot.next_reward}')
-
-
-
-        # Random
-        # rays, counts = robot.move_random()
-        # graphics.update(rays, counts)
-
-
-        # AI
-        # ...
-
+            reward, done, score, collision, lidar_distances, rays, labels_count, battery = robot.play_step(action)
+            graphics.update(robot.environment, robot, rays, (labels_count, battery), score)
 
     pygame.quit()

@@ -64,6 +64,7 @@ def train():
         if done:
             # reset episodio
             robot.reset()
+            graphics.reset(robot)
             agent.n_games += 1
 
             if score > record:
@@ -84,7 +85,7 @@ def train():
 
             plot_training(fig, ax1, ax2, plot_scores, plot_mean_scores, battery_s, clean_over_free_s)
 
-            print(f'# episodes: {agent.n_games}, return: {score}, record (return): {record}, cleaned area: {clean_over_free}%, battery: {battery*100}')
+            print(f'# episodes: {agent.n_games}, return: {score}, record (return): {record}, cleaned area: {clean_over_free}%, battery: {round(battery*100, 2)}')
 
 
 if __name__ == '__main__':

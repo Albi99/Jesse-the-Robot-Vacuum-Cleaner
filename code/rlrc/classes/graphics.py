@@ -8,14 +8,19 @@ from ..constants.colors import BLACK, BLUE_SEMITRASPARENT, BLUE_SEMITRASPARENT_D
 
 class Graphics:
             
-    def __init__(self, envirnonment, robot):
-        self.environment = envirnonment
-        self.robot = robot
+    def __init__(self, robot):
         pygame.init()
         pygame.display.set_caption("Robot Vacuum Prototype")
         self.font = pygame.font.Font(None, 20)
-        self.screen = pygame.display.set_mode((envirnonment.w*2 + 150, envirnonment.h + 100))
         self.clock = pygame.time.Clock()
+        self.reset(robot)
+
+
+    def reset(self, robot):
+        self.robot = robot
+        self.environment = robot.environment
+        self.screen = pygame.display.set_mode((self.environment.w*2 + 150, self.environment.h + 100))
+
                 
     def update(self, environment, robot, rays, status, score):
         grid_status, battery = status

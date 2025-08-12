@@ -4,7 +4,7 @@ from collections import deque
 
 from ..classes.environment import Environment
 from ..constants.maps import MAP_1, MAP_3
-from ..utils import point_in_poly, ray_segment_intersection, too_close_to_corner, rotate_map
+from ..utils import point_in_poly, ray_segment_intersection, too_close_to_corner
 from ..constants.configuration import LABELS_INT_TO_STR, LABELS_STR_TO_INT, ACTION_TO_STRING
 
 
@@ -12,14 +12,6 @@ MAPS = [MAP_1, MAP_3]
 
 class Robot:
     def __init__(self):
-        
-        # internal occupancy grid
-        # self.environment = environment
-        # self.cells_per_side = 5
-        # h = self.environment.h // self.cells_per_side
-        # w = self.environment.w // self.cells_per_side
-        # self.h, self.w = h, w
-        # self.grid = np.full((h, w), 0, dtype=np.int16)
 
         # robot
         self.battery = 1    # 100%
@@ -39,14 +31,6 @@ class Robot:
         self.lidar_num_rays = 36
         self.lidar_max_distance = 400
 
-        # # charging base and robot position
-        # self._set_base(base_position)
-
-        # # per training
-        # self.step = 0
-        # self.next_reward = 0
-        # self.total_reward = 0
-        # self.previus_grid = self.grid.copy()
 
     def _set_base(self, base_position=None):
         if base_position is not None:
@@ -190,7 +174,8 @@ class Robot:
     def reset(self):
 
         # set random map (environment)
-        self.environment = Environment( rotate_map( random.choice(MAPS) ) )
+        # self.environment = Environment( rotate_map( random.choice(MAPS) ) )
+        self.environment = Environment( random.choice(MAPS) )
 
         # internal map
         h = self.environment.h // self.cell_side
@@ -272,8 +257,6 @@ class Robot:
         if self._out_of_environment(nx, ny) or self._check_collision(nx, ny):
             has_collision = 1   # True
             d_collision_point_x, d_collision_point_y = nx // self.cell_side, ny // self.cell_side
-            # print(f"Collision detected at, real coordinates: ({nx:.2f}, {ny:.2f}) ")
-            # print(f"                           internal map: ({dnx}, {dny}) ")
             self.next_reward -= 10
         else:
             has_collision = 0   # False
