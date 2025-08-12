@@ -127,11 +127,6 @@ def train():
             agent.update(last_state_np=state_new)
 
         if done:
-            # reset episodio
-            maps = sample_maps(MAPS_TRAIN)
-            robot.reset(maps)
-            graphics.reset(robot)
-            agent.n_games += 1
 
             if score > record:
                 record = score
@@ -154,6 +149,13 @@ def train():
             print(f'# episodes: {agent.n_games}, return: {score}, record (return): {record}, cleaned area: {clean_over_free}%, battery: {round(battery, 2)}, collisions: {robot.collisions}')
 
             success = clean_over_free >= 80 and battery >= 20 and robot.collisions == 0
+
+            # reset episodio
+            maps = sample_maps(MAPS_TRAIN)
+            robot.reset(maps)
+            graphics.reset(robot)
+            agent.n_games += 1
+
             history.append(success)
             switch_to_test()
 
@@ -196,10 +198,6 @@ def test():
         graphics.update(robot.environment, robot, rays, (labels_count, battery), score)
 
         if done:
-            # reset episodio
-            maps = sample_maps(MAPS_TEST)
-            robot.reset(maps)
-            graphics.reset(robot)
 
             clean_key = np.int16(LABELS_STR_TO_INT['clean'])
             clean = labels_count.get(clean_key, 0)
@@ -211,6 +209,12 @@ def test():
             print(f'# test: {test_index}, return: {score}, record (return): {record}, cleaned area: {clean_over_free}%, battery: {round(battery, 2)}, collisions: {robot.collisions}')
 
             success = clean_over_free >= 80 and battery >= 20 and robot.collisions == 0
+
+            # reset episodio
+            maps = sample_maps(MAPS_TEST)
+            robot.reset(maps)
+            graphics.reset(robot)
+
             history.append(success)
     
     next_level()
