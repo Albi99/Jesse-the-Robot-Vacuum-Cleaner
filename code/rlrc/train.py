@@ -128,11 +128,11 @@ def train():
 
         if done:
 
+            agent.n_games += 1
+
             if score > record:
                 record = score
                 agent.save(level=level)
-
-            agent.n_games += 1
 
             plot_scores.append(score)
             total_score += score
