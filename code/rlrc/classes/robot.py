@@ -481,47 +481,73 @@ class Robot:
 
         return flat_view
 
+    # def _extract_submatrix_flat(self, offset=10):
+    #     """
+    #     Estrae una sottomatrice quadrata centrata sulla cella del robot con metà-lato
+    #     pari al raggio in celle + offset, riempiendo con -999 le celle fuori grid.
+    #     Rimuove quindi le 81 celle del quadrato centrale (9x9) e restituisce
+    #     una lista piatta di interi.
+    #     """
+
+    #     # Calcola centro in coordinate di cella
+    #     cx = int(self.x // self.cell_side)
+    #     cy = int(self.y // self.cell_side)
+
+    #     # Raggio in celle (arrotondato per eccesso)
+    #     cell_radius = int(math.ceil(self.radius / self.cell_side))
+    #     # Estensione desiderata: raggio + 10 celle (50 centimetri)
+    #     half_ext = cell_radius + offset
+    #     size = 2 * half_ext + 1
+
+    #     # Inizializza sottomatrice con valore di padding
+    #     # -2 means "out of map"
+    #     subm = np.full((size, size), -2, dtype=self.grid.dtype)
+
+    #     # Indici di partenza sulla grid originale
+    #     x0 = cx - half_ext
+    #     y0 = cy - half_ext
+
+    #     # Copia i valori validi
+    #     for i in range(size):
+    #         for j in range(size):
+    #             gx = x0 + j
+    #             gy = y0 + i
+    #             if 0 <= gx < self.grid.shape[1] and 0 <= gy < self.grid.shape[0]:
+    #                 subm[i, j] = self.grid[gy, gx]
+
+    #     # # Rimuovi quadrato centrale 9x9
+    #     # c0 = half_ext - 4
+    #     # c1 = half_ext + 5
+    #     # # Maschera per celle da mantenere
+    #     # mask = np.ones_like(subm, dtype=bool)
+    #     # mask[c0:c1, c0:c1] = False
+
+    #     # # Flatten e ritorna lista
+    #     # flat = subm[mask].astype(int).tolist()
+        
+    #     flat = subm.astype(int).tolist()
+    #     return flat
+    
     def _extract_submatrix_flat(self, offset=10):
         """
-        Estrae una sottomatrice quadrata centrata sulla cella del robot con metà-lato
-        pari al raggio in celle + offset, riempiendo con -999 le celle fuori grid.
-        Rimuove quindi le 81 celle del quadrato centrale (9x9) e restituisce
-        una lista piatta di interi.
+        Ritorna una patch 31x31 INT con padding -2 (out of map), SENZA rimuovere il 9x9 centrale.
         """
-
-        # Calcola centro in coordinate di cella
+        import numpy as np, math
         cx = int(self.x // self.cell_side)
         cy = int(self.y // self.cell_side)
-
-        # Raggio in celle (arrotondato per eccesso)
         cell_radius = int(math.ceil(self.radius / self.cell_side))
-        # Estensione desiderata: raggio + 10 celle (50 centimetri)
-        half_ext = cell_radius + offset
-        size = 2 * half_ext + 1
+        half_ext = cell_radius + offset   # con radius=22.5, cell_side=5 => ~9; 9+10=19 -> 2*19+1=39 (adatta se vuoi 31)
+        # Forziamo 31 fisso: half_ext = 15
+        half_ext = 15
+        size = 2 * half_ext + 1           # 31
 
-        # Inizializza sottomatrice con valore di padding
-        # -2 means "out of map"
-        subm = np.full((size, size), -2, dtype=self.grid.dtype)
-
-        # Indici di partenza sulla grid originale
-        x0 = cx - half_ext
-        y0 = cy - half_ext
-
-        # Copia i valori validi
-        for i in range(size):
-            for j in range(size):
-                gx = x0 + j
-                gy = y0 + i
-                if 0 <= gx < self.grid.shape[1] and 0 <= gy < self.grid.shape[0]:
-                    subm[i, j] = self.grid[gy, gx]
-
-        # Rimuovi quadrato centrale 9x9
-        c0 = half_ext - 4
-        c1 = half_ext + 5
-        # Maschera per celle da mantenere
-        mask = np.ones_like(subm, dtype=bool)
-        mask[c0:c1, c0:c1] = False
-
-        # Flatten e ritorna lista
-        flat = subm[mask].astype(int).tolist()
-        return flat
+        # padding vettoriale
+        pad_y = (max(0, half_ext - cy), max(0, cy + half_ext + 1 - self.h))
+        pad_x = (max(0, half_ext - cx), max(0, cx + half_ext + 1 - self.w))
+        sub = self.grid[max(0, cy - half_ext): min(self.h, cy + half_ext + 1),
+                        max(0, cx - half_ext): min(self.w, cx + half_ext + 1)]
+        sub = np.pad(sub, (pad_y, pad_x), mode='constant', constant_values=-2)
+        # garantisci shape 31x31
+        if sub.shape != (31, 31):
+            sub = sub[:31, :31]
+        return sub  # np.int16 (31,31)

@@ -124,7 +124,7 @@ def train():
 
         # aggiorna PPO se abbiamo un rollout completo o se l'episodio termina
         if agent.step_count >= agent.rollout_steps or done:
-            agent.update(last_state_np=state_new)
+            agent.update(last_state_dict=state_new)
 
         if done:
 

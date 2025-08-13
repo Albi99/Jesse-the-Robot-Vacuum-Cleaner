@@ -7,8 +7,8 @@ if __name__ == "__main__":
     # test_canvas()
     # test_all_maps()
 
-    from rlrc.main import main
-    main()
+    # from rlrc.main import main
+    # main()
 
-    # from rlrc.train import train
-    # train()
+    from rlrc.train import train
+    train()
