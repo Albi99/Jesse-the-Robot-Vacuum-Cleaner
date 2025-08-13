@@ -40,17 +40,19 @@ class Graphics:
         
 
         # grid status
-        for i, (val, count) in enumerate(sorted(grid_status.items())):
-            txt = self.font.render(f'{LABELS_INT_TO_STR[int(val)]}: {count}', True, BLACK)
-            self.screen.blit(txt, (environment.w + 150, 35 + 20*i))
+        # for i, (val, count) in enumerate(sorted(grid_status.items())):
+        #     txt = self.font.render(f'{LABELS_INT_TO_STR[int(val)]}: {count}', True, BLACK)
+        #     self.screen.blit(txt, (environment.w + 150, 35 + 20*i))
 
+        # vertical_offset = 20*len(grid_status)
+        vertical_offset = -20
         # battery
         txt = self.font.render(f'battery: {round(battery*100, 2)}%', True, BLACK)
-        self.screen.blit(txt, (environment.w + 150, 35 + 20*len(grid_status)))
+        self.screen.blit(txt, (environment.w + 150, 35 + vertical_offset))
 
         # total reward
         txt = self.font.render(f'return (total reward): {score}', True, BLACK)
-        self.screen.blit(txt, (environment.w + 150, 35 + 20*len(grid_status) + 20))
+        self.screen.blit(txt, (environment.w + 150, 35 + vertical_offset + 20))
 
         # % clean over free
         clean_key = np.int16(LABELS_STR_TO_INT['clean'])
@@ -61,7 +63,7 @@ class Graphics:
         free = grid_status[np.int16(LABELS_STR_TO_INT['free'])]
         clean_over_free = round(clean / (clean + free) * 100, 2)
         txt = self.font.render(f'clean / (clean + free): {clean_over_free} %', True, BLACK)
-        self.screen.blit(txt, (environment.w + 150, 35 + 20*len(grid_status) + 40))
+        self.screen.blit(txt, (environment.w + 150, 35 + vertical_offset + 40))
 
         pygame.display.flip()       # Update all the screen
         self.clock.tick(60)              # ~60 FPS

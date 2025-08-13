@@ -15,6 +15,7 @@ from ..constants.configuration import LABELS_STR_TO_INT
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
+
 def one_hot_patch(flat_vals, H=31, W=31):
     """
     flat_vals: lista/array di len H*W con valori in {-2, 0..4, 5}
@@ -46,6 +47,7 @@ def one_hot_patch(flat_vals, H=31, W=31):
     out[5] = (arr == lbl['base']).astype(np.float32)
     return out  # [6,31,31]
 
+
 class Agent:
     def __init__(self):
         # ------- costruiamo la rete a encoder --------
@@ -71,18 +73,14 @@ class Agent:
         self.optimizer = None
         self.gamma = 0.99
         self.gae_lambda = 0.95
-        self.clip_eps = 0.20
-        self.ent_coef = 0.01
+        self.clip_eps = 0.15            # was 0.20
+        self.ent_coef = 0.03            # was 0.01
         self.vf_coef = 0.5
         self.max_grad_norm = 0.5
 
-        # self.rollout_steps = 2048
-        # self.epochs = 10
-        # self.minibatch_size = 64
-
-        self.rollout_steps = 1024
-        self.epochs = 5
-        self.minibatch_size = 64
+        self.rollout_steps = 1024       # was 2048
+        self.epochs = 5                 # was 10
+        self.minibatch_size = 128       # was 64
 
         # buffer on-policy
         self.reset_buffer()
@@ -101,7 +99,7 @@ class Agent:
                 trunk_dim=256,
                 n_actions=4
             ).to(DEVICE)
-            self.optimizer = optim.Adam(self.model.parameters(), lr=3e-4)
+            self.optimizer = optim.Adam(self.model.parameters(), lr=1e-4)  # was 3e-4
 
     # ============ Stato dal robot: produce i 4 blocchi ============
     def get_state(self, robot, collision, lidar_distances):
@@ -254,6 +252,7 @@ class Agent:
     # ============ Update PPO (con bootstrap sul last_state) ============
     def update(self, last_state_dict):
         self.model.train()  # <-- rete in modalità training per aggiornamento
+        self.ent_coef = max(0.005, self.ent_coef * 0.995) # decadimento entropy
         
         if self.step_count == 0:
             return
@@ -327,6 +326,15 @@ class Agent:
                 self.optimizer.step()
 
         self.reset_buffer()
+        with torch.no_grad():
+            log_ratio = new_logprobs - mb_old_logprobs
+            approx_kl = (-log_ratio).mean().clamp_min(0.0) 
+            if approx_kl < 0.005: message = 'TOO LOW'
+            elif approx_kl > 0.02: message = 'A BIT HIGH'
+            elif approx_kl > 0.05: message = 'TOO HIGH'
+            else: message = 'OK'
+            print(f'approx KL {message} {approx_kl}')
+
 
     # ============ Salvataggio ============
     def save(self, file_name: str = 'model.pth', level=None):

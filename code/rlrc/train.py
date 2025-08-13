@@ -85,7 +85,39 @@ def train():
     global level, history
     global fig, ax1, ax2
     global training
-            
+
+    # penality anti-repeat action
+    MAX_REPEAT = 2
+    last_actions = deque(maxlen=MAX_REPEAT)
+    last_reward = deque(maxlen=MAX_REPEAT)
+    REPEAT_PENALTY = 0.5
+
+    def penality_anti_repeat_action():
+        nonlocal last_actions, last_reward, reward
+        if len(last_actions) == MAX_REPEAT and \
+            all(a == last_actions[0] for a in last_actions) and \
+                all(r < 0 for r in last_reward):
+            reward -= REPEAT_PENALTY
+
+    # penality anti-stuck position
+    prev_cell = None
+    same_cell_steps = 0
+    STUCK_STEPS = 2
+    STUCK_PENALTY = 2.0
+
+    def penality_anti_stuck_position():
+        nonlocal prev_cell, same_cell_steps, reward
+        cell = (robot.x // robot.cell_side, robot.y // robot.cell_side)
+        if prev_cell is not None and cell == prev_cell:
+            same_cell_steps += 1
+        else:
+            same_cell_steps = 0
+        prev_cell = cell
+
+        if same_cell_steps >= STUCK_STEPS:
+            reward -= STUCK_PENALTY
+            same_cell_steps = 0    # reset del contatore
+
     # reset episodio
     maps = sample_maps(MAPS_TRAIN)
     robot.reset(maps)
@@ -114,6 +146,10 @@ def train():
         # aggiorna cache per prossimo ciclo
         old_collision = collision
         old_lidar_distances = lidar_distances.copy()
+
+        penality_anti_repeat_action()
+        penality_anti_stuck_position()
+        score += reward
 
         # render
         graphics.update(robot.environment, robot, rays, (labels_count, battery), score)
