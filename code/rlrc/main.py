@@ -38,5 +38,6 @@ def main():
         if action is not None:
             reward, done, score, collision, lidar_distances, rays, labels_count, battery = robot.play_step(action)
             graphics.update(robot.environment, robot, rays, (labels_count, battery), score)
+            # robot.print_state(collision, lidar_distances)
 
     pygame.quit()
