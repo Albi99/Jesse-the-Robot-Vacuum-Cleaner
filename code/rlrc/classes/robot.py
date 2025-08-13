@@ -255,7 +255,28 @@ class Robot:
         if self._out_of_environment(nx, ny) or self._check_collision(nx, ny):
             self.collisions += 1
             has_collision = 1   # True
-            d_collision_point_x, d_collision_point_y = nx // self.cell_side, ny // self.cell_side
+
+            # offset dal centro verso il bordo del robot lungo self.angle
+            cos = math.cos(self.angle)
+            sin = math.sin(self.angle)
+            ox = cos * self.radius
+            oy = sin * self.radius
+
+            if cos == 1: ox -= 1
+            if sin == 1: oy -= 1
+
+            px = nx + ox
+            py = ny + oy
+
+            # converto in coordinate di cella
+            # d_collision_point_x = int((px + self.epsilon) // self.cell_side)
+            # d_collision_point_y = int((py + self.epsilon) // self.cell_side)
+
+            # converto in coordinate di cella
+            d_collision_point_x = int(px // self.cell_side)
+            d_collision_point_y = int(py // self.cell_side)
+
+            # self.grid[d_collision_point_y, d_collision_point_x] = LABELS_STR_TO_INT['static obstacle']
             self.next_reward -= 10
         else:
             has_collision = 0   # False
@@ -346,6 +367,8 @@ class Robot:
                 gx = int((hit_x + self.epsilon) // self.cell_side)
                 gy = int((hit_y + self.epsilon) // self.cell_side)
                 if 0 <= gx < self.w and 0 <= gy < self.h:
+                    if math.sin(self.angle) == 1: gy -= 1
+                    if math.cos(self.angle) == 1: gx -= 1
                     self.grid[gy, gx] = LABELS_STR_TO_INT['static obstacle']
             else:
                 # se non c'è impatto segno self.lidar_max_distance

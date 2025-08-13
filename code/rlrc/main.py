@@ -2,11 +2,12 @@ import pygame
 
 from .classes.robot import Robot
 from .classes.graphics import Graphics
+from .constants.maps import MAPS_TRAIN, MAPS_TEST
 
 
 def main():
 
-    robot = Robot()
+    robot = Robot(MAPS_TRAIN[-1])
     graphics = Graphics(robot)
 
     running = True
