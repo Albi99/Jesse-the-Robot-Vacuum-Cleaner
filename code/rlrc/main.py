@@ -7,7 +7,7 @@ from .constants.maps import MAPS_TRAIN, MAPS_TEST
 
 def main():
 
-    robot = Robot(MAPS_TRAIN[-1])
+    robot = Robot( [ MAPS_TRAIN[0][0] ] )
     graphics = Graphics(robot)
 
     running = True

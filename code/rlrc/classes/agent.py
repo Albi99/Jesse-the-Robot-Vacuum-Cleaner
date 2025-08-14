@@ -74,7 +74,7 @@ class Agent:
         self.gamma = 0.99
         self.gae_lambda = 0.95
         self.clip_eps = 0.15            # was 0.20
-        self.ent_coef = 0.03            # was 0.01
+        self.ent_coef = 0.03            # was 0.01 and 0.02 and 0.03
         self.vf_coef = 0.5
         self.max_grad_norm = 0.5
 

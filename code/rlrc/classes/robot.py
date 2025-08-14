@@ -140,7 +140,8 @@ class Robot:
         # 7) footprint della base
         self._footprint('base')
 
-        self.base_position = (self.x, self.y)
+        self.base_position = (self.x//self.cell_side, self.y//self.cell_side)
+
 
     def _percent_on_base(self) -> bool:
         """
@@ -168,11 +169,13 @@ class Robot:
 
         return count_base / total
 
+
     def reset(self, maps, rotation=None):
 
         # set random map (environment)
         # self.environment = Environment( rotate_map( random.choice(MAPS) ) )
         self.environment = Environment( random.choice(maps), k=rotation )
+        self.last_dist_to_base = 0
 
         # internal map
         h = self.environment.h // self.cell_side
@@ -190,6 +193,7 @@ class Robot:
         self.step = 0
         self.collisions = 0
         self.battery = 1
+
 
     def play_step(self, action):
         self.next_reward = 0
@@ -213,29 +217,44 @@ class Robot:
         if self._percent_on_base() > 0:
             # if is too early
             if clean_over_free < .8:
-                self.next_reward -= 100
-            else:
-                self.next_reward += 10
+                self.next_reward -= 100.0 * self._percent_on_base()
         
-        # back in base (end game)
-        # 3 step to leave the base
-        if self._percent_on_base() > .8 and self.step > 3:
-            done = True
-        elif self.battery < self.delta_battery_per_step:
-            # se non rientra in base
-            self.next_reward -= 100
+        # back in base
+        if self._percent_on_base() > .8:
+            if self.step <= 3:
+                # before leaving the base
+                self.next_reward -= 25.0 * (4 - self.step)
+            else:
+                # end episode
+                done = True
+                # if too early
+                if clean_over_free < .8:
+                    self.next_reward -= 100.0
+                # if ok
+                else:
+                    self.next_reward += clean_over_free * 100.0
+        
+        # nudge to base
+        if clean_over_free >= .8:
+            current_dist = self._dist_to_base() 
+            if current_dist < self.last_dist_to_base:
+                self.next_reward += 0.25 * (self.last_dist_to_base - current_dist)
+            self.last_dist_to_base = current_dist
+        
+        # se non rientra in base
+        if self.battery < self.delta_battery_per_step:
+            self.next_reward -= 100.0
             done = True
 
         # penality for battery consume (penality step)
-        self.next_reward -= (1 - self.battery) * 100
+        self.next_reward -= 1 - self.battery
         
-        self.next_reward /= 100
         self.total_reward += self.next_reward
         # TODO: maybe add score = cleanded area / total area to clean
         return self.next_reward, done, self.total_reward, collision, lidar_distances, rays, labels_count, self.battery
 
-    def move(self, direction):
 
+    def move(self, direction):
         # direction: one of 'up','down','left','right' or angle delta
         if isinstance(direction, str):
             if direction == 'right': self.angle = 0
@@ -269,15 +288,11 @@ class Robot:
             py = ny + oy
 
             # converto in coordinate di cella
-            # d_collision_point_x = int((px + self.epsilon) // self.cell_side)
-            # d_collision_point_y = int((py + self.epsilon) // self.cell_side)
-
-            # converto in coordinate di cella
             d_collision_point_x = int(px // self.cell_side)
             d_collision_point_y = int(py // self.cell_side)
 
             # self.grid[d_collision_point_y, d_collision_point_x] = LABELS_STR_TO_INT['static obstacle']
-            self.next_reward -= 10
+            self.next_reward -= 5.0
         else:
             has_collision = 0   # False
             d_collision_point_x, d_collision_point_y = 0, 0
@@ -292,11 +307,14 @@ class Robot:
         self.battery -= self.delta_battery_per_step
         return (has_collision, d_collision_point_x, d_collision_point_y), lidar_distances, rays, labels_count
 
+
     def move_random(self):
         self.move(random.uniform(-0.3, 0.3))
 
+
     def _out_of_environment(self, nx, ny):
         return nx - self.radius < 0 or nx + self.radius > self.environment.w or ny - self.radius < 0 or ny + self.radius > self.environment.h
+
 
     def _check_collision(self, cx, cy):
         for x1, y1, x2, y2 in self.environment.walls:
@@ -304,6 +322,7 @@ class Robot:
             if self._point_segment_dist(cx, cy, x1, y1, x2, y2) <= self.radius + self.epsilon:
                 return True
         return False
+
 
     def _point_segment_dist(self, px, py, x1, y1, x2, y2):
         # Vettore segmento
@@ -319,6 +338,7 @@ class Robot:
         proj_x, proj_y = x1 + t*sx, y1 + t*sy
         return math.hypot(px-proj_x, py-proj_y)
 
+
     def _cast_ray(self, angle):
         # Direzione del raggio
         dx, dy = math.cos(angle), math.sin(angle)
@@ -331,6 +351,7 @@ class Robot:
         if nearest is not None:
             return nearest, self.x+dx*nearest, self.y+dy*nearest
         return -1, None, None
+
 
     def _sense_lidar(self):
         lidar_distances = []
@@ -379,6 +400,7 @@ class Robot:
             rays.append((hit_x, hit_y))
         return lidar_distances, rays
 
+
     def _footprint(self, label):
         # robot position inside the internal map
         robot_center_gx = int(self.x//self.cell_side);
@@ -394,6 +416,7 @@ class Robot:
                         and self.grid[gy, gx] != LABELS_STR_TO_INT['static obstacle']:
                         self.grid[gy,gx] = LABELS_STR_TO_INT[label]
     
+
     def grid_diff(self):
         """
         Confronta lo snapshot precedente della griglia (self.previus_grid)
@@ -411,9 +434,10 @@ class Robot:
         delta_clean = curr_clean - prev_clean
         # Aggiorna snapshot precedente
         self.previus_grid = curr.copy()
-        self.next_reward += - delta_unknow / 2
-        self.next_reward += delta_clean * 10
+        self.next_reward += - delta_unknow / 200
+        self.next_reward += delta_clean / 10
  
+
     def labels_count(self):
         unique, counts = np.unique(self.grid, return_counts=True)
         lc = {int(k): int(v) for k, v in zip(unique, counts)}
@@ -422,6 +446,7 @@ class Robot:
                 lc[label_int] = 0
         return lc
     
+
     def grid_view(self):
         # Parametri di griglia e label
         labels = LABELS_INT_TO_STR.keys()
@@ -476,58 +501,11 @@ class Robot:
                 ray_list.append((count, d))
             result.append(ray_list)
 
-            
             flat_view = [v for ray in result for (c, d) in ray for v in (c, d)]
 
         return flat_view
-
-    # def _extract_submatrix_flat(self, offset=10):
-    #     """
-    #     Estrae una sottomatrice quadrata centrata sulla cella del robot con metà-lato
-    #     pari al raggio in celle + offset, riempiendo con -999 le celle fuori grid.
-    #     Rimuove quindi le 81 celle del quadrato centrale (9x9) e restituisce
-    #     una lista piatta di interi.
-    #     """
-
-    #     # Calcola centro in coordinate di cella
-    #     cx = int(self.x // self.cell_side)
-    #     cy = int(self.y // self.cell_side)
-
-    #     # Raggio in celle (arrotondato per eccesso)
-    #     cell_radius = int(math.ceil(self.radius / self.cell_side))
-    #     # Estensione desiderata: raggio + 10 celle (50 centimetri)
-    #     half_ext = cell_radius + offset
-    #     size = 2 * half_ext + 1
-
-    #     # Inizializza sottomatrice con valore di padding
-    #     # -2 means "out of map"
-    #     subm = np.full((size, size), -2, dtype=self.grid.dtype)
-
-    #     # Indici di partenza sulla grid originale
-    #     x0 = cx - half_ext
-    #     y0 = cy - half_ext
-
-    #     # Copia i valori validi
-    #     for i in range(size):
-    #         for j in range(size):
-    #             gx = x0 + j
-    #             gy = y0 + i
-    #             if 0 <= gx < self.grid.shape[1] and 0 <= gy < self.grid.shape[0]:
-    #                 subm[i, j] = self.grid[gy, gx]
-
-    #     # # Rimuovi quadrato centrale 9x9
-    #     # c0 = half_ext - 4
-    #     # c1 = half_ext + 5
-    #     # # Maschera per celle da mantenere
-    #     # mask = np.ones_like(subm, dtype=bool)
-    #     # mask[c0:c1, c0:c1] = False
-
-    #     # # Flatten e ritorna lista
-    #     # flat = subm[mask].astype(int).tolist()
-        
-    #     flat = subm.astype(int).tolist()
-    #     return flat
     
+
     def _extract_submatrix_flat(self, offset=10):
         """
         Ritorna una patch 31x31 INT con padding -2 (out of map), SENZA rimuovere il 9x9 centrale.
@@ -551,3 +529,7 @@ class Robot:
         if sub.shape != (31, 31):
             sub = sub[:31, :31]
         return sub  # np.int16 (31,31)
+
+
+    def _dist_to_base(self):
+        return math.sqrt((self.base_position[0] - self.x//self.cell_side)**2 + (self.base_position[1] - self.y//self.cell_side)**2)
