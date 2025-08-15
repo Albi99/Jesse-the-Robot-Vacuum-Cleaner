@@ -1,14 +1,24 @@
+import sys
 
 
 if __name__ == "__main__":
 
-    # from rlrc.test import test_shit, test_canvas, test_all_maps
-    # test_shit()
-    # test_canvas()
-    # test_all_maps()
+    arg = sys.argv[1]
 
-    # from rlrc.main import main
-    # main()
+    if arg == 'test':
+        from rlrc.test import test_shit, test_canvas, test_all_maps
+        # test_shit()
+        # test_canvas()
+        test_all_maps()
+    
+    elif arg == 'joystick':
+        from rlrc.joystick import joystick
+        joystick()
 
-    from rlrc.train import train
-    train()
+    elif arg == 'nn':
+        from rlrc.train import train
+        train()
+
+    else:
+        print('INVALID ARG !')
+        print('Choose between: test, joystick, nn.')

@@ -217,37 +217,34 @@ class Robot:
         if self._percent_on_base() > 0:
             # if is too early
             if clean_over_free < .8:
-                self.next_reward -= 100.0 * self._percent_on_base()
+                self.next_reward -= 1.0 * self._percent_on_base()
         
         # back in base
-        if self._percent_on_base() > .8:
-            if self.step <= 3:
-                # before leaving the base
-                self.next_reward -= 25.0 * (4 - self.step)
+        if self._percent_on_base() > .8 and \
+            (clean_over_free > 0.8 or self.battery < 0.2 ):
+            # end episode
+            done = True
+            # if too early
+            if clean_over_free < .8:
+                self.next_reward -= 1.0
+            # if ok
             else:
-                # end episode
-                done = True
-                # if too early
-                if clean_over_free < .8:
-                    self.next_reward -= 100.0
-                # if ok
-                else:
-                    self.next_reward += clean_over_free * 100.0
+                self.next_reward += clean_over_free
         
         # nudge to base
         if clean_over_free >= .8:
             current_dist = self._dist_to_base() 
             if current_dist < self.last_dist_to_base:
-                self.next_reward += 0.25 * (self.last_dist_to_base - current_dist)
+                self.next_reward += 0.1 * (self.last_dist_to_base - current_dist)
             self.last_dist_to_base = current_dist
         
         # se non rientra in base
         if self.battery < self.delta_battery_per_step:
-            self.next_reward -= 100.0
+            self.next_reward -= 1.0
             done = True
 
         # penality for battery consume (penality step)
-        self.next_reward -= 1 - self.battery
+        self.next_reward -= (1 - self.battery) / 10.0
         
         self.total_reward += self.next_reward
         # TODO: maybe add score = cleanded area / total area to clean
@@ -292,7 +289,7 @@ class Robot:
             d_collision_point_y = int(py // self.cell_side)
 
             # self.grid[d_collision_point_y, d_collision_point_x] = LABELS_STR_TO_INT['static obstacle']
-            self.next_reward -= 5.0
+            self.next_reward -= 0.5
         else:
             has_collision = 0   # False
             d_collision_point_x, d_collision_point_y = 0, 0
@@ -310,6 +307,17 @@ class Robot:
 
     def move_random(self):
         self.move(random.uniform(-0.3, 0.3))
+
+    
+    def leave_base(self):
+        for _ in range(int(self.radius*2//self.cell_side)):
+            collision, lidar_distances, rays, labels_count = self.move(0)
+        
+        self.next_reward = 0
+        reward = score = 0
+        done = False
+
+        return reward, done, score, collision, lidar_distances, rays, labels_count, self.battery
 
 
     def _out_of_environment(self, nx, ny):
@@ -434,8 +442,8 @@ class Robot:
         delta_clean = curr_clean - prev_clean
         # Aggiorna snapshot precedente
         self.previus_grid = curr.copy()
-        self.next_reward += - delta_unknow / 200
-        self.next_reward += delta_clean / 10
+        self.next_reward += - delta_unknow / 500
+        self.next_reward += delta_clean / 100
  
 
     def labels_count(self):

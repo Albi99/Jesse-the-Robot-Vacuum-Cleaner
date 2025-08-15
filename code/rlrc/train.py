@@ -90,10 +90,10 @@ def train():
     MIN_REPEAT = 1
     last_actions = []
     last_reward = []
-    REPEAT_REWARD = 0.1
+    REPEAT_REWARD = 0.01
 
     def streak_stright_reward():
-        nonlocal last_actions, last_reward, reward
+        nonlocal last_actions, last_reward, reward, extra_reward
 
         last_actions.append(action)
         last_reward.append(reward)
@@ -102,7 +102,7 @@ def train():
         if streak >= MIN_REPEAT:
             if all(a == last_actions[0] for a in last_actions) and \
                 all(r > 0 for r in last_reward):
-                    reward += REPEAT_REWARD * streak
+                    extra_reward += REPEAT_REWARD * streak
             else: 
                 last_actions = []
                 last_reward = []
@@ -110,30 +110,34 @@ def train():
     # penality anti-stuck position
     prev_cell = None
     same_cell_steps = 0
+    same_cell_steps_malus_coeff = 0
     STUCK_STEPS = 2
-    STUCK_PENALTY = 2.0
+    STUCK_PENALTY = 0.25
 
     def penality_anti_stuck_position():
-        nonlocal prev_cell, same_cell_steps, reward
+        nonlocal prev_cell, same_cell_steps, same_cell_steps_malus_coeff, extra_reward
 
         cell = (robot.x // robot.cell_side, robot.y // robot.cell_side)
         if prev_cell is not None and cell == prev_cell:
             same_cell_steps += 1
+            if same_cell_steps >= STUCK_STEPS:
+                same_cell_steps_malus_coeff +=1
+                extra_reward -= STUCK_PENALTY * same_cell_steps_malus_coeff
         else:
             same_cell_steps = 0
+            same_cell_steps_malus_coeff = 0
         prev_cell = cell
-
-        if same_cell_steps >= STUCK_STEPS:
-            reward -= STUCK_PENALTY
-            same_cell_steps = 0    # reset del contatore
 
     # reset episodio
     maps = sample_maps(MAPS_TRAIN)
     robot.reset(maps)
     graphics.reset(robot)
 
-    old_collision = (0, 0, 0) # No collision
-    old_lidar_distances, _ = robot._sense_lidar()
+    reward, done, score, collision, lidar_distances, rays, labels_count, battery = robot.leave_base()
+    graphics.update(robot.environment, robot, rays, (labels_count, battery), score)
+
+    old_collision = collision
+    old_lidar_distances = lidar_distances
 
     while training:
 
@@ -141,6 +145,8 @@ def train():
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 training = False          # chiusura con “X”
+
+        extra_reward = 0
 
         # stato corrente
         state_old = agent.get_state(robot, old_collision, old_lidar_distances)
@@ -158,13 +164,14 @@ def train():
 
         penality_anti_stuck_position()
         streak_stright_reward()
-        score += reward
+        robot.next_reward += extra_reward
+        score += extra_reward
 
         # render
         graphics.update(robot.environment, robot, rays, (labels_count, battery), score)
         print(f'action: {action}, reward: {robot.next_reward}')
 
-        # memorizza nel buffer PPO
+        # memorizza nel buffer PPO (per rollout)
         agent.store_step(state_old, action, logprob, value, reward, done)
 
         # aggiorna PPO se abbiamo un rollout completo o se l'episodio termina

@@ -73,7 +73,7 @@ class Agent:
         self.optimizer = None
         self.gamma = 0.99
         self.gae_lambda = 0.95
-        self.clip_eps = 0.15            # was 0.20
+        self.clip_eps = 0.20            # was 0.20 and 0.15 and 0.10
         self.ent_coef = 0.03            # was 0.01 and 0.02 and 0.03
         self.vf_coef = 0.5
         self.max_grad_norm = 0.5
@@ -99,7 +99,7 @@ class Agent:
                 trunk_dim=256,
                 n_actions=4
             ).to(DEVICE)
-            self.optimizer = optim.Adam(self.model.parameters(), lr=1e-4)  # was 3e-4
+            self.optimizer = optim.Adam(self.model.parameters(), lr=1e-5)  # was 3e-4 and 1e-4 and 1e-5
 
     # ============ Stato dal robot: produce i 4 blocchi ============
     def get_state(self, robot, collision, lidar_distances):
@@ -252,7 +252,7 @@ class Agent:
     # ============ Update PPO (con bootstrap sul last_state) ============
     def update(self, last_state_dict):
         self.model.train()  # <-- rete in modalità training per aggiornamento
-        self.ent_coef = max(0.005, self.ent_coef * 0.995) # decadimento entropy
+        self.ent_coef = max(0.005, self.ent_coef * 0.999) # decadimento entropy
         
         if self.step_count == 0:
             return
