@@ -289,7 +289,7 @@ class Robot:
             d_collision_point_y = int(py // self.cell_side)
 
             # self.grid[d_collision_point_y, d_collision_point_x] = LABELS_STR_TO_INT['static obstacle']
-            self.next_reward -= 0.5
+            self.next_reward -= 0.25
         else:
             has_collision = 0   # False
             d_collision_point_x, d_collision_point_y = 0, 0

@@ -11,12 +11,12 @@ from .constants.configuration import LABELS_STR_TO_INT
 from .constants.maps import MAPS_TRAIN, MAPS_TEST
 
 
-global plot_scores, plot_mean_scores
-global battery_s, clean_over_free_s
+global plot_scores, plot_mean_scores, plot_collisions_number
+global plot_battery, plot_clean_over_free
 global total_score
 global record
-plot_scores, plot_mean_scores = [], []
-battery_s, clean_over_free_s = [], []
+plot_scores, plot_mean_scores, plot_collisions_number = [], [], []
+plot_battery, plot_clean_over_free = [], []
 total_score = 0
 record = 0
 
@@ -79,8 +79,8 @@ def next_level():
 
 def train():
     
-    global plot_scores, plot_mean_scores
-    global battery_s, clean_over_free_s
+    global plot_scores, plot_mean_scores, plot_collisions_number
+    global plot_battery, plot_clean_over_free
     global total_score, record
     global level, history
     global fig, ax1, ax2
@@ -169,7 +169,7 @@ def train():
 
         # render
         graphics.update(robot.environment, robot, rays, (labels_count, battery), score)
-        print(f'action: {action}, reward: {robot.next_reward}')
+        # print(f'action: {action}, reward: {robot.next_reward}')
 
         # memorizza nel buffer PPO (per rollout)
         agent.store_step(state_old, action, logprob, value, reward, done)
@@ -190,16 +190,17 @@ def train():
             total_score += score
             mean_score = total_score / agent.n_games
             plot_mean_scores.append(mean_score)
+            plot_collisions_number.append(robot.collisions)
 
             clean_key = np.int16(LABELS_STR_TO_INT['clean'])
             clean = labels_count.get(clean_key, 0)
             free = labels_count[np.int16(LABELS_STR_TO_INT['free'])]
             clean_over_free = round(clean / (clean + free) * 100, 2)
             battery *= 100
-            battery_s.append(battery)
-            clean_over_free_s.append(clean_over_free)
+            plot_battery.append(battery)
+            plot_clean_over_free.append(clean_over_free)
 
-            plot_training(fig, ax1, ax2, plot_scores, plot_mean_scores, battery_s, clean_over_free_s)
+            plot_training(fig, ax1, ax2, plot_scores, plot_mean_scores, plot_collisions_number, plot_battery, plot_clean_over_free)
             print(f'# episodes: {agent.n_games}, return: {round(score, 2)}, record (return): {round(record, 2)}, cleaned area: {clean_over_free}%, battery: {round(battery, 2)}, collisions: {robot.collisions}')
 
             success = clean_over_free >= 80 and battery >= 20 and robot.collisions == 0
@@ -258,7 +259,7 @@ def test():
             clean_over_free = round(clean / (clean + free) * 100, 2)
             battery *= 100
 
-            plot_training(fig, ax1, ax2, plot_scores, plot_mean_scores, battery_s, clean_over_free_s)
+            plot_training(fig, ax1, ax2, plot_scores, plot_mean_scores, plot_battery, plot_clean_over_free)
             print(f'# test: {test_index}, return: {round(score, 2)}, record (return): {round(record, 2)}, cleaned area: {clean_over_free}%, battery: {round(battery, 2)}, collisions: {robot.collisions}')
 
             success = clean_over_free >= 80 and battery >= 20 and robot.collisions == 0

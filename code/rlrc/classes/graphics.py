@@ -10,7 +10,7 @@ class Graphics:
             
     def __init__(self, robot):
         pygame.init()
-        pygame.display.set_caption("Robot Vacuum Prototype")
+        pygame.display.set_caption("Robot Cleaner")
         self.font = pygame.font.Font(None, 20)
         self.clock = pygame.time.Clock()
         self.reset(robot)

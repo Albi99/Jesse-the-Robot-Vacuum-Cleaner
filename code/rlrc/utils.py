@@ -73,7 +73,7 @@ def setup_plot():
 
     return fig, ax1, ax2
 
-def plot_training(fig, ax1, ax2, scores, mean_scores, battery_s, clean_over_free_s):
+def plot_training(fig, ax1, ax2, scores, mean_scores, collisions, battery_s, clean_over_free_s):
     display.clear_output(wait=True)
 
     # --- Primo grafico ---
@@ -81,21 +81,24 @@ def plot_training(fig, ax1, ax2, scores, mean_scores, battery_s, clean_over_free
     ax1.set_title('Return')
     ax1.set_xlabel('Number of episodes')
     ax1.set_ylabel('Return (total reward)')
-    ax1.plot(scores, label='Score')
-    ax1.plot(mean_scores, label='Mean Score')
+    ax1.plot(range(1, len(scores) + 1), scores, label='Score')
+    ax1.plot(range(1, len(mean_scores) + 1), mean_scores, label='Mean Score')
+    ax1.plot(range(1, len(collisions) + 1), collisions, label='Collisions')
     ax1.legend()
     if scores:
         ax1.text(len(scores)-1, scores[-1], f"{scores[-1]:.2f}")
     if mean_scores:
         ax1.text(len(mean_scores)-1, mean_scores[-1], f"{mean_scores[-1]:.2f}")
+    if collisions:
+        ax1.text(len(collisions)-1, collisions[-1], f"{collisions[-1]:.2f}")
 
     # --- Secondo grafico ---
     ax2.cla()
     ax2.set_title('Battery Level & Cleaned Area')
     ax2.set_xlabel('Number of episodes')
     ax2.set_ylabel('%')
-    ax2.plot(battery_s, label='Battery Level')
-    ax2.plot(clean_over_free_s, label='Cleaned Area')
+    ax2.plot(range(1, len(battery_s) + 1), battery_s, label='Battery Level')
+    ax2.plot(range(1, len(clean_over_free_s) + 1), clean_over_free_s, label='Cleaned Area')
     ax2.set_ylim(0, 110)
     ax2.legend()
     if battery_s:
