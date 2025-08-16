@@ -196,14 +196,33 @@ class Robot:
 
 
     def play_step(self, action):
+
+        done = False
         self.next_reward = 0
         self.step += 1
+
         if not isinstance(action, str):
             action = ACTION_TO_STRING[action]
         collision, lidar_distances, rays, labels_count = self.move(action)
-        self.grid_diff()
 
-        done = False
+        # --- Bonus "aderenza muro" (0 celle dal muro, senza collisione) ---
+        if collision[0] == 0 and len(lidar_distances) > 0:
+            import numpy as np
+            min_d = float(min(lidar_distances))
+            cell = float(self.cell_side)
+
+            eps = 0.1 * cell     # margine di sicurezza (10% della cella)
+            k   = 0.03           # intensità del bonus
+            p   = 2.0            # rende il picco più pronunciato vicino al muro
+
+            if min_d >= eps and min_d < cell:
+                # normalizza in [0,1] dentro [eps, cell), poi rovescia (più vicino => più bonus)
+                u = (min_d - eps) / (cell - eps)          # 0 quando sei quasi a contatto (sicuro), 1 quando sei a 1 cella
+                bonus = k * (1.0 - u) ** p
+                self.next_reward += bonus
+
+        # bonus exploreation and cleaning
+        self.grid_diff()
 
         clean_key = np.int16(LABELS_STR_TO_INT['clean'])
         if clean_key in labels_count:
@@ -289,7 +308,7 @@ class Robot:
             d_collision_point_y = int(py // self.cell_side)
 
             # self.grid[d_collision_point_y, d_collision_point_x] = LABELS_STR_TO_INT['static obstacle']
-            self.next_reward -= 0.25
+            self.next_reward -= 0.1
         else:
             has_collision = 0   # False
             d_collision_point_x, d_collision_point_y = 0, 0
@@ -442,8 +461,34 @@ class Robot:
         delta_clean = curr_clean - prev_clean
         # Aggiorna snapshot precedente
         self.previus_grid = curr.copy()
+
+        # bonus exploration
         self.next_reward += - delta_unknow / 500
+
+        # bonus cleaning
         self.next_reward += delta_clean / 100
+
+        # bonus cleaning edge
+        CLEAN = LABELS_STR_TO_INT['clean']
+        OBST  = LABELS_STR_TO_INT['static obstacle']
+
+        curr_clean_mask = (curr == CLEAN)
+        prev_clean_mask = (prev == CLEAN)
+        new_clean = curr_clean_mask & (~prev_clean_mask)
+
+        obst = (curr == OBST)
+
+        # 4-neighborhood of obstacles (no convoluzioni, solo shift)
+        adj_obst = np.zeros_like(obst, dtype=bool)
+        adj_obst[:-1, :] |= obst[1:, :]   # up
+        adj_obst[1:,  :] |= obst[:-1, :]  # down
+        adj_obst[:, :-1] |= obst[:, 1:]   # left
+        adj_obst[:, 1: ] |= obst[:, :-1]  # right
+
+        edge_new_clean = new_clean & adj_obst
+        edge_count = int(edge_new_clean.sum())
+
+        self.next_reward += edge_count / 50.0
  
 
     def labels_count(self):

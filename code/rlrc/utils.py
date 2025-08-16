@@ -90,7 +90,7 @@ def plot_training(fig, ax1, ax2, scores, mean_scores, collisions, battery_s, cle
     if mean_scores:
         ax1.text(len(mean_scores)-1, mean_scores[-1], f"{mean_scores[-1]:.2f}")
     if collisions:
-        ax1.text(len(collisions)-1, collisions[-1], f"{collisions[-1]:.2f}")
+        ax1.text(len(collisions)-1, collisions[-1], f"{collisions[-1]}")
 
     # --- Secondo grafico ---
     ax2.cla()
