@@ -11,32 +11,18 @@ from .constants.configuration import LABELS_STR_TO_INT
 from .constants.maps import MAPS_TRAIN, MAPS_TEST
 
 
-global plot_scores, plot_mean_scores, plot_collisions_number
-global plot_battery, plot_clean_over_free
-global total_score
-global record
 plot_scores, plot_mean_scores, plot_collisions_number = [], [], []
 plot_battery, plot_clean_over_free = [], []
 total_score = 0
 record = 0
 
 # for Curriculum Learning
-global level                        # ultima fascia sbloccata (indice)
-global max_level
-global W                            # ampezza finestra mobile
-global history                      # success/fail ultimi W episodi
-global BIAS_LAST                    # prob. di pescare dall’ultima fascia
-level = 1
-max_level = 4
-W = 100
+level = 1                           # ultima fascia sbloccata (indice)
+max_level = 4                       # ampezza finestra mobile
+W = 100                             # success/fail ultimi W episodi
 history = deque(maxlen=W)
-BIAS_LAST = 0.6
+BIAS_LAST = 0.6                     # prob. di estrarre una mappa dall’ultima fascia
 
-# global robot
-# global graphics
-global fig, ax1, ax2
-# global agent
-global training
 robot = Robot(MAPS_TEST[level])
 graphics = Graphics(robot)
 fig, ax1, ax2 = setup_plot()
@@ -77,6 +63,50 @@ def next_level():
             print('LAST LEVEL ACHIEVED !!!')
 
 
+# streak stright reward
+extra_reward = 0
+MIN_REPEAT = 1
+last_actions = []
+last_reward = []
+REPEAT_REWARD = 0.5
+
+def streak_stright_reward(action, reward):
+    global last_actions, last_reward, extra_reward
+
+    last_actions.append(action)
+    last_reward.append(reward)
+    streak = len(last_actions)
+
+    if streak >= MIN_REPEAT:
+        if all(a == last_actions[0] for a in last_actions) and \
+            all(r > 0 for r in last_reward):
+                extra_reward += REPEAT_REWARD * streak
+        else: 
+            last_actions = []
+            last_reward = []
+
+# penality anti-stuck position
+global prev_cell, same_cell_steps, same_cell_steps_malus_coeff
+prev_cell = None
+same_cell_steps = 0
+same_cell_steps_malus_coeff = 0
+STUCK_STEPS = 2
+STUCK_PENALTY = 0.25
+
+def penality_anti_stuck_position():
+    global prev_cell, same_cell_steps, same_cell_steps_malus_coeff, extra_reward
+
+    cell = (robot.x // robot.cell_side, robot.y // robot.cell_side)
+    if prev_cell is not None and cell == prev_cell:
+        same_cell_steps += 1
+        if same_cell_steps >= STUCK_STEPS:
+            same_cell_steps_malus_coeff +=1
+            extra_reward -= STUCK_PENALTY * same_cell_steps_malus_coeff
+    else:
+        same_cell_steps = 0
+        same_cell_steps_malus_coeff = 0
+    prev_cell = cell
+
 def train():
     
     global plot_scores, plot_mean_scores, plot_collisions_number
@@ -86,58 +116,17 @@ def train():
     global fig, ax1, ax2
     global training
 
-    # streak stright reward
-    MIN_REPEAT = 1
-    last_actions = []
-    last_reward = []
-    REPEAT_REWARD = 0.01
-
-    def streak_stright_reward():
-        nonlocal last_actions, last_reward, reward, extra_reward
-
-        last_actions.append(action)
-        last_reward.append(reward)
-        streak = len(last_actions)
-
-        if streak >= MIN_REPEAT:
-            if all(a == last_actions[0] for a in last_actions) and \
-                all(r > 0 for r in last_reward):
-                    extra_reward += REPEAT_REWARD * streak
-            else: 
-                last_actions = []
-                last_reward = []
-
-    # penality anti-stuck position
-    prev_cell = None
-    same_cell_steps = 0
-    same_cell_steps_malus_coeff = 0
-    STUCK_STEPS = 2
-    STUCK_PENALTY = 0.25
-
-    def penality_anti_stuck_position():
-        nonlocal prev_cell, same_cell_steps, same_cell_steps_malus_coeff, extra_reward
-
-        cell = (robot.x // robot.cell_side, robot.y // robot.cell_side)
-        if prev_cell is not None and cell == prev_cell:
-            same_cell_steps += 1
-            if same_cell_steps >= STUCK_STEPS:
-                same_cell_steps_malus_coeff +=1
-                extra_reward -= STUCK_PENALTY * same_cell_steps_malus_coeff
-        else:
-            same_cell_steps = 0
-            same_cell_steps_malus_coeff = 0
-        prev_cell = cell
-
     # reset episodio
     maps = sample_maps(MAPS_TRAIN)
     robot.reset(maps)
     graphics.reset(robot)
 
-    reward, done, score, collision, lidar_distances, rays, labels_count, battery = robot.leave_base()
-    graphics.update(robot.environment, robot, rays, (labels_count, battery), score)
+    # leave the base
+    # reward, done, score, collision, lidar_distances, rays, labels_count, battery = robot.leave_base()
+    # graphics.update(robot.environment, robot, rays, (labels_count, battery), score)
 
-    old_collision = collision
-    old_lidar_distances = lidar_distances
+    # old_collision = collision
+    # old_lidar_distances = lidar_distances
 
     while training:
 
@@ -147,6 +136,8 @@ def train():
                 training = False          # chiusura con “X”
 
         extra_reward = 0
+        old_collision = (0, 0, 0)   # no collision
+        old_lidar_distances, _ = robot._sense_lidar()
 
         # stato corrente
         state_old = agent.get_state(robot, old_collision, old_lidar_distances)
@@ -163,7 +154,7 @@ def train():
         old_lidar_distances = lidar_distances.copy()
 
         penality_anti_stuck_position()
-        streak_stright_reward()
+        streak_stright_reward(action, reward)
         robot.next_reward += extra_reward
         score += extra_reward
 

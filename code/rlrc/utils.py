@@ -78,9 +78,9 @@ def plot_training(fig, ax1, ax2, scores, mean_scores, collisions, battery_s, cle
 
     # --- Primo grafico ---
     ax1.cla()  # clear axis
-    ax1.set_title('Return')
+    ax1.set_title('Return & Collisions')
     ax1.set_xlabel('Number of episodes')
-    ax1.set_ylabel('Return (total reward)')
+    # ax1.set_ylabel('Return (total reward)')
     ax1.plot(range(1, len(scores) + 1), scores, label='Score')
     ax1.plot(range(1, len(mean_scores) + 1), mean_scores, label='Mean Score')
     ax1.plot(range(1, len(collisions) + 1), collisions, label='Collisions')
@@ -90,7 +90,7 @@ def plot_training(fig, ax1, ax2, scores, mean_scores, collisions, battery_s, cle
     if mean_scores:
         ax1.text(len(mean_scores)-1, mean_scores[-1], f"{mean_scores[-1]:.2f}")
     if collisions:
-        ax1.text(len(collisions)-1, collisions[-1], f"{collisions[-1]}")
+        ax1.text(len(collisions)-1, collisions[-1], collisions[-1])
 
     # --- Secondo grafico ---
     ax2.cla()

@@ -206,20 +206,19 @@ class Robot:
         collision, lidar_distances, rays, labels_count = self.move(action)
 
         # --- Bonus "aderenza muro" (0 celle dal muro, senza collisione) ---
-        if collision[0] == 0 and len(lidar_distances) > 0:
-            import numpy as np
-            min_d = float(min(lidar_distances))
-            cell = float(self.cell_side)
+        # if collision[0] == 0 and len(lidar_distances) > 0:
+        #     min_d = float(min(lidar_distances))
+        #     cell = float(self.cell_side)
 
-            eps = 0.1 * cell     # margine di sicurezza (10% della cella)
-            k   = 0.03           # intensità del bonus
-            p   = 2.0            # rende il picco più pronunciato vicino al muro
+        #     eps = 0.1 * cell     # margine di sicurezza (10% della cella)
+        #     k   = 0.03           # intensità del bonus
+        #     p   = 2.0            # rende il picco più pronunciato vicino al muro
 
-            if min_d >= eps and min_d < cell:
-                # normalizza in [0,1] dentro [eps, cell), poi rovescia (più vicino => più bonus)
-                u = (min_d - eps) / (cell - eps)          # 0 quando sei quasi a contatto (sicuro), 1 quando sei a 1 cella
-                bonus = k * (1.0 - u) ** p
-                self.next_reward += bonus
+        #     if min_d >= eps and min_d < cell:
+        #         # normalizza in [0,1] dentro [eps, cell), poi rovescia (più vicino => più bonus)
+        #         u = (min_d - eps) / (cell - eps)          # 0 quando sei quasi a contatto (sicuro), 1 quando sei a 1 cella
+        #         bonus = k * (1.0 - u) ** p
+        #         self.next_reward += bonus
 
         # bonus exploreation and cleaning
         self.grid_diff()
@@ -243,12 +242,11 @@ class Robot:
             (clean_over_free > 0.8 or self.battery < 0.2 ):
             # end episode
             done = True
-            # if too early
-            if clean_over_free < .8:
-                self.next_reward -= 1.0
-            # if ok
-            else:
+            # if is the right time to come back in base
+            if clean_over_free > .8:
                 self.next_reward += clean_over_free
+            # else:
+            #     self.next_reward -= clean_over_free                
         
         # nudge to base
         if clean_over_free >= .8:
@@ -462,13 +460,7 @@ class Robot:
         # Aggiorna snapshot precedente
         self.previus_grid = curr.copy()
 
-        # bonus exploration
-        self.next_reward += - delta_unknow / 500
-
-        # bonus cleaning
-        self.next_reward += delta_clean / 100
-
-        # bonus cleaning edge
+        # preparation for bonus cleaning edge
         CLEAN = LABELS_STR_TO_INT['clean']
         OBST  = LABELS_STR_TO_INT['static obstacle']
 
@@ -488,7 +480,17 @@ class Robot:
         edge_new_clean = new_clean & adj_obst
         edge_count = int(edge_new_clean.sum())
 
-        self.next_reward += edge_count / 50.0
+        # bonus exploration
+        self.next_reward += - delta_unknow / 450
+
+        if delta_clean > 0:
+            # bonus cleaning
+            self.next_reward += delta_clean / 90
+        else:
+            # malus not cleaning
+            self.next_reward -= 1.0
+            # bonus cleaning edge
+            self.next_reward += edge_count / 45
  
 
     def labels_count(self):
