@@ -230,38 +230,34 @@ class Robot:
             clean = 0
         free = labels_count[np.int16(LABELS_STR_TO_INT['free'])]
         clean_over_free = (clean / (clean + free))
+        
+        # datte 'na mossa (additional penality step)
+        if clean_over_free > 0.80:
+            self.next_reward -= 0.25
+        if self.battery <= 0.20:
+            self.next_reward -= 0.25
 
-        # if step over base
-        if self._percent_on_base() > 0:
-            # if is too early
-            if clean_over_free < .8:
-                self.next_reward -= 1.0 * self._percent_on_base()
-        
-        # back in base
-        if self._percent_on_base() > .8 and \
-            (clean_over_free > 0.8 or self.battery < 0.2 ):
-            # end episode
-            done = True
-            # if is the right time to come back in base
-            if clean_over_free > .8:
-                self.next_reward += clean_over_free
-            # else:
-            #     self.next_reward -= clean_over_free                
-        
         # nudge to base
-        if clean_over_free >= .8:
+        if clean_over_free >= 0.99 or self.battery <= 0.20:
             current_dist = self._dist_to_base() 
             if current_dist < self.last_dist_to_base:
-                self.next_reward += 0.1 * (self.last_dist_to_base - current_dist)
+                self.next_reward += 1.0 * (self.last_dist_to_base - current_dist)
+                if self.battery <= 0.10:
+                    self.next_reward += 1.0 * (self.last_dist_to_base - current_dist)
             self.last_dist_to_base = current_dist
         
+        # back in base
+        if self._percent_on_base() > .5 and \
+            (clean_over_free >= 0.99 or self.battery < 0.20 ):
+            # end episode
+            done = True
+            if clean_over_free > 0.80:
+                self.next_reward += 10 * clean_over_free
+
         # se non rientra in base
         if self.battery < self.delta_battery_per_step:
-            self.next_reward -= 1.0
+            self.next_reward -= 10.0
             done = True
-
-        # penality for battery consume (penality step)
-        self.next_reward -= (1 - self.battery) / 10.0
         
         self.total_reward += self.next_reward
         # TODO: maybe add score = cleanded area / total area to clean
@@ -306,7 +302,7 @@ class Robot:
             d_collision_point_y = int(py // self.cell_side)
 
             # self.grid[d_collision_point_y, d_collision_point_x] = LABELS_STR_TO_INT['static obstacle']
-            self.next_reward -= 0.1
+            self.next_reward -= 1.0
         else:
             has_collision = 0   # False
             d_collision_point_x, d_collision_point_y = 0, 0
@@ -486,11 +482,11 @@ class Robot:
         if delta_clean > 0:
             # bonus cleaning
             self.next_reward += delta_clean / 90
+            # bonus cleaning edge
+            self.next_reward += edge_count / 225
         else:
             # malus not cleaning
-            self.next_reward -= 1.0
-            # bonus cleaning edge
-            self.next_reward += edge_count / 45
+            self.next_reward -= 0.25
  
 
     def labels_count(self):

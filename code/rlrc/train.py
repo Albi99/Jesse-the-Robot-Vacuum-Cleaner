@@ -68,7 +68,7 @@ extra_reward = 0
 MIN_REPEAT = 1
 last_actions = []
 last_reward = []
-REPEAT_REWARD = 0.5
+REPEAT_REWARD = 0.25
 
 def streak_stright_reward(action, reward):
     global last_actions, last_reward, extra_reward
