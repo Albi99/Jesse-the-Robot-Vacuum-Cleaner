@@ -13,6 +13,11 @@ from .encoders import (
 from ..constants.configuration import LABELS_STR_TO_INT
 
 
+# Limita PyTorch a N core
+N = 8
+torch.set_num_threads(N)
+torch.set_num_interop_threads(N)
+
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
@@ -78,9 +83,9 @@ class Agent:
         self.vf_coef = 0.5
         self.max_grad_norm = 0.5
 
-        self.rollout_steps = 1024       # was 2048
-        self.epochs = 5                 # was 10
-        self.minibatch_size = 128       # was 64
+        self.rollout_steps = 2048       # was 2048
+        self.epochs = 10                # was 10
+        self.minibatch_size = 64        # was 64
 
         # buffer on-policy
         self.reset_buffer()
@@ -99,7 +104,7 @@ class Agent:
                 trunk_dim=256,
                 n_actions=4
             ).to(DEVICE)
-            self.optimizer = optim.Adam(self.model.parameters(), lr=1e-5)  # was 3e-4 and 1e-4 and 1e-6
+            self.optimizer = optim.Adam(self.model.parameters(), lr=1e-4)
 
     # ============ Stato dal robot: produce i 4 blocchi ============
     def get_state(self, robot, collision, lidar_distances):

@@ -12,7 +12,8 @@ class Robot:
 
         # robot
         self.battery = 1    # 100%
-        self.delta_battery_per_step = 0.0001    # autonomia: 500 metri = 10'000 steps
+        # self.delta_battery_per_step = 0.0001    # autonomia: 500 metri = 10'000 steps
+        self.delta_battery_per_step = 0.001    # autonomia: 50 metri = 1'000 steps
         self.radius = 22.5
         self.cell_side = 5
         self.speed = self.cell_side
@@ -81,7 +82,7 @@ class Robot:
                 raise RuntimeError("Nessuna cella valida trovata per la base con raggio = %d celle" % cells_in)
 
             # raggio di sicurezza dagli angoli (in celle)
-            CORNER_SAFE_CELLS = self.footprint_cells + 1
+            CORNER_SAFE_CELLS = self.footprint_cells + 2
             CORNER_SAFE_PX = CORNER_SAFE_CELLS * self.cell_side
             EPS = self.epsilon
 
@@ -231,7 +232,7 @@ class Robot:
         free = labels_count[np.int16(LABELS_STR_TO_INT['free'])]
         clean_over_free = (clean / (clean + free))
         
-        # datte 'na mossa (additional penality step)
+        # malus datte 'na mossa (additional penality step)
         if clean_over_free > 0.80:
             self.next_reward -= 0.25
         if self.battery <= 0.20:
