@@ -121,13 +121,6 @@ def train():
     robot.reset(maps)
     graphics.reset(robot)
 
-    # leave the base
-    # reward, done, score, collision, lidar_distances, rays, labels_count, battery = robot.leave_base()
-    # graphics.update(robot.environment, robot, rays, (labels_count, battery), score)
-
-    # old_collision = collision
-    # old_lidar_distances = lidar_distances
-
     while training:
 
         # to move the window around the desktop
