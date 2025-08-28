@@ -1,7 +1,7 @@
 # Jesse the (ro)bot 🤠🤖🧹
 *A robotic vacuum cleaner simulation powered by Reinforcement Learning.*
 
-![cover](images/cover.png)
+![cover](./cover.png)
 
 ## 🚀 About
 This repository contains the implementation of **Jesse the (ro)bot**, a simulated robotic vacuum cleaner trained with Reinforcement Learning as part of the course *Complex Systems: Models and Simulation* at Università degli studi di Milano-Bicocca (Italy).  
